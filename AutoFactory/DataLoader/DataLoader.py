@@ -43,10 +43,10 @@ class DataLoader:
             if date not in lst:
                 os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
             day = date.split('-')
-            end_date = str(datetime.date(int(day[0]), int(day[1]), int(day[2])).timedelta(days=1))
+            # end_date = str(datetime.date(int(day[0]), int(day[1]), int(day[2])).timedelta(days=1))
             stock_data = get_price(all_stocks, frequency='daily',
                                    field=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close', 'factor'],
-                                   start_date=date, end_date=end_date)
+                                   start_date=date, end_date=date)
             with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
                 pickle.dump(stock_data, f)
         if 'index_daily' in data_type:
@@ -77,31 +77,42 @@ class DataLoader:
     v1.0
     2021-08-30
     1. 需要解析一个字段，告诉DataLoader应该取从什么地方到什么地方的收益率，例如开盘价收益率或者日内收益率，周收益率等
+        a. 具有形式"{}_{}_{}".format(data, data, day)的形式，表示从其中一个数据到另一个数据中间间隔day天
+           例如open_close_4表示周一开盘价到周五收盘价
+    2021-08-31
+    1. 向前回溯例天数，默认100天，然后还要获得一个日期和下标对应的字典，以确定回测时的对应
     """
 
     def get_matrix_data(self, back_test_name='default', frequency='daily',
-                        start_date='2021-01-01', end_date='2021-06-30'):  # 读入dataframe数据另存为便于处理的矩阵形式
+                        start_date='2021-01-01', end_date='2021-06-30', back_windows=100,
+                        return_type='open_close_4'):
+        # 读入dataframe数据另存为便于处理的矩阵形式
         tmp = start_date.split('-')
         start_date = datetime.date(int(tmp[0]), int(tmp[1]), int(tmp[2]))  # 回测开始时间
         tmp = end_date.split('-')
         end_date = datetime.date(int(tmp[0]), int(tmp[1]), int(tmp[2]))  # 回测结束时间
+
         if frequency == 'daily':  # 当前仅支持日频的回测
             lst = os.listdir('{}'.format(self.back_test_data_path))
             if back_test_name not in lst:
                 os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
             lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
             if 'code_order_dic.pkl' not in lst:  # code_order_dic用于存储该回测区间内出现过的股票代码到矩阵位置的映射
+                print('getting data...')
                 dates = os.listdir('{}/StockDailyData'.format(self.data_path))
                 codes_order_dic = {}
                 order = 0
-                days = 1
-                for i in range((end_date - start_date).days + 1):
+                days = 0
+                date_position_dic = {}  # 记录日期对应到数据矩阵的位置
+                length = int(return_type.split('_')[-1])  # 表示需要延后几天以获得对应的收益
+                for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
                     date = start_date + datetime.timedelta(days=i)
-                    if str(date) in dates:  # 要加入判断今天是否全市场停牌，方法是检测相邻两天是不是完全一致
+                    if str(date) in dates:  # 要加入判断今天是否全市场停牌，方法是检测相邻两天是不是完全一致，目前暂时手动删除了节假日
+                        date_position_dic[date] = days
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
-                            codes = list(data.index)
+                            codes = list(data['codes'])
                             for code in codes:
                                 try:
                                     codes_order_dic[code]
@@ -111,37 +122,40 @@ class DataLoader:
                         days += 1
                 with open('{}/{}/code_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(codes_order_dic, f)
-            else:
-                with open('{}/{}/code_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
-                    codes_order_dic = pickle.load(f)
-                dates = os.listdir('{}/StockDailyData'.format(self.data_path))
-                days = 1
-                for i in range((end_date - start_date).days + 1):
+                with open('{}/{}/date_position_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(date_position_dic, f)
+
+                """
+                获得数据字典
+                """
+                names = ['open', 'close', 'high', 'low', 'volume', 'money']
+                data_dic = {}
+                for name in names:
+                    data_dic[name] = np.zeros((days, len(codes_order_dic)))
+
+                ret = np.zeros((days, len(codes_order_dic)))
+                start_name = return_type.split('_')[0]
+                end_name = return_type.split('_')[1]
+
+                k = 0
+                for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
                     date = start_date + datetime.timedelta(days=i)
                     if str(date) in dates:
-                        days += 1
+                        with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
+                                                                             date, date), 'rb') as file:
+                            data = pickle.load(file)
+                            index = list(data[codes])
+                            for j in range(len(data)):
+                                for name in names:
+                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name][j]
+                            print('{} done.'.format(date))
+                            k += 1
+                ret[:-length] = data_dic[end_name][length:] / data_dic[start_name][:-length] - 1
+                ret[np.isnan(ret)] = 0
+                with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(data_dic, f)
+                with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(ret, f)
 
-            names = ['open', 'close', 'high', 'low', 'volume', 'money']
-            data_dic = {}
-            for name in names:
-                data_dic[name] = np.zeros((days, len(codes_order_dic)))
 
-            ret = np.zeros((days, len(codes_order_dic)))
 
-            k = 0
-            for i in range((end_date - start_date).days + 1):
-                date = start_date + datetime.timedelta(days=i)
-                if str(date) in dates:
-                    with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
-                                                                         date, date), 'rb') as file:
-                        data = pickle.load(file)
-                        index = list(data.index)
-                        for j in range(len(data)):
-                            for name in names:
-                                data_dic[name][k, codes_order_dic[index[j]]] = data[name][j]
-                            ret[k, codes_order_dic[index[j]]] = data['close'][j] / data['open'][j] - 1  # 需要改成定制的收益率
-                        k += 1
-            with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
-                pickle.dump(data_dic, f)
-            with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
-                pickle.dump(ret, f)
