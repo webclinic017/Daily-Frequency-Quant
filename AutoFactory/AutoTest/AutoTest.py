@@ -6,7 +6,7 @@ This code is used for calculating the average IC and other statistical values of
 
 v1.0
 2021-08-30
--- 定义：计算平均IC，信号自相关，理论换手率
+-- 定义：计算平均IC，信号自相关系数，IC_IR，IC为正的频率
 """
 
 import numpy as np
@@ -17,6 +17,8 @@ class Stats:
         self.ICs = []
         self.mean_IC = 0
         self.auto_corr = 0
+        self.IC_IR = 0
+        self.positive_IC_rate = 0
 
 
 class AutoTest:
@@ -39,8 +41,12 @@ class AutoTest:
         ics[np.isnan(ics)] = 0
         auto_corr = np.array(auto_corr)
         auto_corr[np.isnan(auto_corr)] = 0
+
         stats = Stats()
         stats.ICs = ics
         stats.mean_IC = np.mean(ics)
         stats.auto_corr = np.mean(auto_corr)
+        if len(ics) > 1:
+            stats.IC_IR = np.mean(ics) / np.std(ics)
+        stats.positive_IC_rate = np.sum(ics > 0) / len(ics)
         return stats
