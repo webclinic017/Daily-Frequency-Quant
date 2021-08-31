@@ -34,6 +34,11 @@ class DataLoader:
     """
 
     def get_pv_data(self, date, data_type=None):  # 获得日频量价关系数据
+        """
+        :param date: 获取的的日期
+        :param data_type: 数据类型，stock_daily表示日频股票
+        :return: 无返回值
+        """
         if data_type is None:  # 参数默认值不要是可变的，否则可能出错
             data_type = ['stock_daily']
 
@@ -86,6 +91,15 @@ class DataLoader:
     def get_matrix_data(self, back_test_name='default', frequency='daily',
                         start_date='2021-01-01', end_date='2021-06-30', back_windows=100,
                         return_type='open_close_4'):
+        """
+        :param back_test_name: 该回测的名字
+        :param frequency: 回测频率，目前默认且仅支持日频
+        :param start_date: 回测开始时间
+        :param end_date: 结束时间
+        :param back_windows: 开始时间向前多长的滑动窗口
+        :param return_type: 该字段描述需要预测的收益率类型
+        :return:
+        """
         # 读入dataframe数据另存为便于处理的矩阵形式
         tmp = start_date.split('-')
         start_date = datetime.date(int(tmp[0]), int(tmp[1]), int(tmp[2]))  # 回测开始时间
@@ -112,7 +126,7 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
-                            codes = list(data['codes'])
+                            codes = list(data['code'])
                             for code in codes:
                                 try:
                                     codes_order_dic[code]
@@ -144,10 +158,11 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
-                            index = list(data[codes])
+                            index = list(data['code'])
+
                             for j in range(len(data)):
                                 for name in names:
-                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name][j]
+                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
                             print('{} done.'.format(date))
                             k += 1
                 ret[:-length] = data_dic[end_name][length:] / data_dic[start_name][:-length] - 1
