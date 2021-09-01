@@ -42,38 +42,6 @@ class SignalGenerator:
             c[np.isinf(c)] = 0
         self.operation_dic['div'] = div
 
-        """
-        单目运算符
-        """
-
-        @nb.jit()
-        def csrank(a):
-            b = a.copy()  # 测试用，可以不用复制
-            for i in range(len(a)):
-                n = np.sum(a[i] != 0)
-                if n == 0:
-                    continue
-                tmp = a[i][a[i] != 0].copy()
-                pos = tmp.argsort()
-                for j in range(len(tmp)):
-                    tmp[pos[j]] = j
-                tmp /= (n - 1)
-                b[i][b[i] != 0] = tmp
-            return b
-        self.operation_dic['csrank'] = csrank
-
-        @nb.jit
-        def tsrank(a, num):
-            for i in range(len(a)):
-                if i < num - 1:
-                    continue
-                for j in range(a.shape[1]):
-                    tmp = a[i - num + 1:i + 1, j].sort()
-                    a[i, j] = np.where(tmp == a[i, j])[0]
-                    a[i, j] /= (num - 1)
-            return a
-        self.operation_dic['tsrank'] = tsrank
-
         @nb.jit
         def tscorr(a, b, num):
             s = np.zeros(a.shape)
@@ -83,6 +51,7 @@ class SignalGenerator:
                 for j in range(a.shape[1]):
                     s[i, j] = np.corrcoef(a[i - num + 1:i + 1, j], b[i - num + 1:i + 1, j])[0, 1]
             return s
+
         self.operation_dic['tscorr'] = tscorr
 
         def tsdelay(a, num):
@@ -141,6 +110,7 @@ class SignalGenerator:
                     s[i, j] = np.mean((a[i - num + 1:i + 1, j] - np.mean(a[i - num + 1:i + 1, j])) ** 3) / \
                               (np.std(a[i - num + 1:i + 1, j])) ** 3
             return s
+
         self.operation_dic['tsskew'] = tsskew
 
         @nb.jit
@@ -152,6 +122,7 @@ class SignalGenerator:
                 for j in range(a.shape[1]):
                     s[i, j] = np.corrcoef(a[i - num + 1:i + 1, j], a[i - num + 1 - delta:i + 1 - delta, j])[0, 1]
             return s
+
         self.operation_dic['tsautocorr'] = tsautocorr
 
         @nb.jit
@@ -165,7 +136,40 @@ class SignalGenerator:
                     s[i, j] = np.sum(w * (a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))) / \
                               np.std(a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))
             return s
+
         self.operation_dic['wdirect'] = wdirect
+
+        @nb.jit
+        def tsrank(a, num):
+            for i in range(len(a)):
+                if i < num - 1:
+                    continue
+                for j in range(a.shape[1]):
+                    tmp = a[i - num + 1:i + 1, j].sort()
+                    a[i, j] = np.where(tmp == a[i, j])[0]
+                    a[i, j] /= (num - 1)
+            return a
+        self.operation_dic['tsrank'] = tsrank
+
+        """
+        单目运算符
+        """
+
+        @nb.jit()
+        def csrank(a):
+            b = a.copy()  # 测试用，可以不用复制
+            for i in range(len(a)):
+                n = np.sum(a[i] != 0)
+                if n == 0:
+                    continue
+                tmp = a[i][a[i] != 0].copy()
+                pos = tmp.argsort()
+                for j in range(len(tmp)):
+                    tmp[pos[j]] = j
+                tmp /= (n - 1)
+                b[i][b[i] != 0] = tmp
+            return b
+        self.operation_dic['csrank'] = csrank
 
         @nb.jit
         def zscore(a):
@@ -177,5 +181,9 @@ class SignalGenerator:
                 a[i][a[i] >= 3] = 3
                 a[i][a[i] <= -3] = -3
         self.operation_dic['zscore'] = zscore
+
+
+
+
 
 

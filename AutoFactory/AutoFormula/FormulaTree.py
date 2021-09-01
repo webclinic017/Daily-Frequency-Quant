@@ -29,17 +29,25 @@ class FormulaTree:
     def __init__(self, height=2, symmetric=False):
         self.height = height
         self.symmetric = symmetric
-        self.datas = ['open', 'high', 'low', 'close', 'vwap', 'tvr_ratio']
 
+        self.datas = ['open', 'high', 'low', 'close', 'vwap', 'tvr_ratio']
         for i in range(1, 31):
             for data in self.datas[:6]:
                 tree = Node(name='tsdelay', variable_type='operation',
-                                   operation_type='1_num')
+                            operation_type='1_num')
                 tree.left = Node(name=data, variable_type='data')
+                tree.num = i
                 self.datas.append(tree)
+
+        self.operation_dic = {'1': ['csrank', 'zscore'],
+                              '1_num': ['wdirect', 'tsrank', 'tskurtosis', 'tsskew',
+                                        'tsmean', 'tsstd', 'tsdelay', 'tsdelta'],
+                              '2': ['add', 'prod', 'minus', 'div'],
+                              '2_num': ['tscorr']}
 
     def init_tree(self, height, symmetric=False):
         if symmetric:
             if height == 1:
                 operation_type = np.random.choice(['1', '1_num', '2', '2_num'],
                                                   p=[1 / 10, 4 / 10, 4 / 10, 1 / 10])[0]
+                operation =
