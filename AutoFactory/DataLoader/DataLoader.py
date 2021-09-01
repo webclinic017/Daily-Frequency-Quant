@@ -9,6 +9,9 @@ v1.0
 -- 暂时不支持分钟数据，因为聚宽的数据查询有次数限制
 -- get_pv_data方法的参数data_type传入一个列表，表示需要的数据
 -- 原始的数据读出来后构造成一个字典，关键字就是原先的列名，值是按照日期排列的矩阵
+
+2021-09-01
+-- 更新：每日量价数据
 """
 
 import numpy as np
@@ -33,9 +36,10 @@ class DataLoader:
     get_pv_data定义了从聚宽读取量价数据(pv for Price & Volume)并保存在本地的方法
     """
 
-    def get_pv_data(self, date, data_type=None):  # 获得日频量价关系数据
+    def get_pv_data(self, start_date, end_date, data_type=None):  # 获得日频量价关系数据
         """
-        :param date: 获取的的日期
+        :param start_date: 开始日期
+        :param end_date: 结束日期
         :param data_type: 数据类型，stock_daily表示日频股票
         :return: 无返回值
         """
@@ -43,21 +47,46 @@ class DataLoader:
             data_type = ['stock_daily']
 
         if 'stock_daily' in data_type:
-            all_stocks = list(get_all_securities(types=['stock'], date=date).index)
+            all_stocks = list(get_all_securities(types=['stock'], date=end_date).index)  # 只获取最后一天的
+
             lst = os.listdir('{}/StockDailyData'.format(self.data_path))
-            if date not in lst:
-                os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
-            day = date.split('-')
-            # end_date = str(datetime.date(int(day[0]), int(day[1]), int(day[2])).timedelta(days=1))
-            stock_data = get_price(all_stocks, frequency='daily',
-                                   field=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close', 'factor'],
-                                   start_date=date, end_date=date)
-            with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                pickle.dump(stock_data, f)
+
+            start_date = start_date.split('-')
+            end_date = end_date.split('-')
+
+            begin = datetime.date(int(start_date[0]), int(start_date[1]), int(start_date[2]))
+            end = datetime.date(int(end_date[0]), int(end_date[1]), int(end_date[2]))
+
+            for i in range((end - begin).days + 1):
+                date = begin + datetime.timedelta(days=i)
+                if str(date) not in lst:
+                    os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
+                # 获得价格数据
+                stock_data = get_price(all_stocks, frequency='daily',
+                                       fields=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
+                                               'factor', 'avg'],
+                                       start_date=date, end_date=date)
+                stock_data.index = stock_data['code']
+                # 获得资金流数据
+                money_flow = get_money_flow(all_stocks, start_date=date, end_date=date)
+                money_flow.index = money_flow['sec_code']
+                # 获取财务数据
+                fundamental = get_fundamentals(query(valuation, indicator), date=date)
+                fundamental.index = fundamental['code']
+                with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
+                    pickle.dump(money_flow, f)
+                with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
+                    pickle.dump(fundamental, f)
+                with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
+                    pickle.dump(stock_data, f)
+                print('{} done.'.format(date))
+
+        """
         if 'index_daily' in data_type:
             all_indexes = get_all_securities(types=['index'], date=date)
             with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
                 pickle.dump(all_indexes, f)
+        
 
         if 'minute' in data_type:
             lst = os.listdir('{}/StockIntraDayData'.format(self.data_path))
@@ -75,6 +104,7 @@ class DataLoader:
                                                start_date=date, end_date=end_date)
                     with open('{}/StockIntraDayData/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
                         pickle.dump(intra_day_data, f)
+        """
 
     """
     get_matrix_data方法读取给定起始日期的原始数据，并生成需要的收益率矩阵，字典等
@@ -130,7 +160,7 @@ class DataLoader:
                             for code in codes:
                                 try:
                                     codes_order_dic[code]
-                                except KeyError as e:  # 代码规范：最好写明具体的错误类型
+                                except KeyError:  # 代码规范：最好写明具体的错误类型
                                     codes_order_dic[code] = order
                                     order += 1
                         days += 1
@@ -142,7 +172,8 @@ class DataLoader:
                 """
                 获得数据字典
                 """
-                names = ['open', 'close', 'high', 'low', 'volume', 'money']
+                names = ['open', 'close', 'high', 'low', 'avg', 'turnover_ratio',
+                         'net_pct_main', 'net_pct_xl', 'net_pct_l', 'net_pct_m', 'net_pct_s']
                 data_dic = {}
                 for name in names:
                     data_dic[name] = np.zeros((days, len(codes_order_dic)))
@@ -159,18 +190,30 @@ class DataLoader:
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
                             index = list(data['code'])
-
                             for j in range(len(data)):
-                                for name in names:
+                                for name in names[:5]:
                                     data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
-                            print('{} done.'.format(date))
-                            k += 1
+
+                        with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
+                                                                                   date, date), 'rb') as file:
+                            data = pickle.load(file)
+                            index = list(data['code'])
+                            for j in range(len(data)):
+                                for name in names[5]:
+                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+
+                        with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path,
+                                                                                  date, date), 'rb') as file:
+                            data = pickle.load(file)
+                            index = list(data['code'])
+                            for j in range(len(data)):
+                                for name in names[6:]:
+                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                        print('{} done.'.format(date))
+                        k += 1
                 ret[:-length] = data_dic[end_name][length:] / data_dic[start_name][:-length] - 1
                 ret[np.isnan(ret)] = 0
                 with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(data_dic, f)
                 with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(ret, f)
-
-
-
