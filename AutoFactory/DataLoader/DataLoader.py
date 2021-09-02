@@ -59,6 +59,8 @@ class DataLoader:
 
             for i in range((end - begin).days + 1):
                 date = begin + datetime.timedelta(days=i)
+                if date.weekday() in [5, 6]:
+                    continue
                 if str(date) not in lst:
                     os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
                 # 获得价格数据
@@ -185,10 +187,14 @@ class DataLoader:
                 k = 0
                 for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
                     date = start_date + datetime.timedelta(days=i)
+                    if date.weekday() in [5, 6]:
+                        continue
                     if str(date) in dates:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
+                            if len(data) == 0:
+                                continue
                             index = list(data['code'])
                             for j in range(len(data)):
                                 for name in names[:5]:
@@ -197,15 +203,18 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
                                                                                    date, date), 'rb') as file:
                             data = pickle.load(file)
-                            index = list(data['code'])
+                            index = list(data.index)
                             for j in range(len(data)):
-                                for name in names[5]:
-                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                                for name in names[5:6]:
+                                    try:
+                                        data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                                    except KeyError:
+                                        pass
 
                         with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path,
                                                                                   date, date), 'rb') as file:
                             data = pickle.load(file)
-                            index = list(data['code'])
+                            index = list(data.index)
                             for j in range(len(data)):
                                 for name in names[6:]:
                                     data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]

@@ -8,6 +8,7 @@ v1.0
 
 import numba as nb
 
+
 class SignalGenerator:
     def __init__(self):
         self.operation_dic = {}
