@@ -26,6 +26,12 @@ import datetime
 class DataLoader:
     def __init__(self, user_id, password, data_path='F:/Documents/AutoFactoryData',
                  back_test_data_path='F:/Documents/AutoFactoryData/BackTestData'):
+        """
+        :param user_id: 登录聚宽的用户id
+        :param password: 登录密码
+        :param data_path: 存放数据的路径
+        :param back_test_data_path: 回测数据的存放路径
+        """
         self.data_path = data_path
         self.back_test_data_path = back_test_data_path  # 该路径用于存放某一次回测所需要的任何字典
         self.user_id = user_id
@@ -39,17 +45,17 @@ class DataLoader:
     def get_pv_data(self, start_date, end_date, data_type=None):  # 获得日频量价关系数据
         """
         :param start_date: 开始日期
-        :param end_date: 结束日期
+        :param end_date: 结束日期，增量更新时这两个值设为相同
         :param data_type: 数据类型，stock_daily表示日频股票
         :return: 无返回值
         """
         if data_type is None:  # 参数默认值不要是可变的，否则可能出错
             data_type = ['stock_daily']
 
-        if 'stock_daily' in data_type:
+        if 'stock_daily' in data_type:  # 获取日频量价、资金流数据
             all_stocks = list(get_all_securities(types=['stock'], date=end_date).index)  # 只获取最后一天的
 
-            lst = os.listdir('{}/StockDailyData'.format(self.data_path))
+            lst = os.listdir('{}/StockDailyData'.format(self.data_path))  # 所有的日期文件夹
 
             start_date = start_date.split('-')
             end_date = end_date.split('-')
@@ -59,15 +65,18 @@ class DataLoader:
 
             for i in range((end - begin).days + 1):
                 date = begin + datetime.timedelta(days=i)
-                if date.weekday() in [5, 6]:
+                if date.weekday() in [5, 6]:  # 略过周末
                     continue
-                if str(date) not in lst:
-                    os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
+
                 # 获得价格数据
                 stock_data = get_price(all_stocks, frequency='daily',
                                        fields=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
                                                'factor', 'avg'],
                                        start_date=date, end_date=date)
+                if len(stock_data) == 0:  # 判断当天有无交易
+                    continue
+                if str(date) not in lst:
+                    os.makedirs('{}/StockDailyData/{}'.format(self.data_path, date))
                 stock_data.index = stock_data['code']
                 # 获得资金流数据
                 money_flow = get_money_flow(all_stocks, start_date=date, end_date=date)
@@ -153,8 +162,10 @@ class DataLoader:
                 length = int(return_type.split('_')[-1])  # 表示需要延后几天以获得对应的收益
                 for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
                     date = start_date + datetime.timedelta(days=i)
-                    if str(date) in dates:  # 要加入判断今天是否全市场停牌，方法是检测相邻两天是不是完全一致，目前暂时手动删除了节假日
-                        date_position_dic[date] = days
+                    if date.weekday() in [5, 6]:
+                        continue
+                    if str(date) in dates:
+                        date_position_dic[date] = days  # 这个日期对应的矩阵第几行
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
@@ -195,7 +206,7 @@ class DataLoader:
                             data = pickle.load(file)
                             if len(data) == 0:
                                 continue
-                            index = list(data['code'])
+                            index = list(data.index)
                             for j in range(len(data)):
                                 for name in names[:5]:
                                     data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
