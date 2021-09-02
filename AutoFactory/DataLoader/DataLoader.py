@@ -237,3 +237,4 @@ class DataLoader:
                     pickle.dump(data_dic, f)
                 with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(ret, f)
+                return codes_order_dic, date_position_dic, data_dic, ret

@@ -4,8 +4,9 @@
 该代码定义一个调用FormulaTree类生成公式树的自动化公式生成器，然后返回一个公式
 """
 
-import os
-os.path.append('../BackTester')
+import sys
+sys.path.append('../Tester')
+
 from FormulaTree import FormulaTree
 from SignalGenerator import SignalGenerator
 
@@ -36,27 +37,13 @@ class AutoFormula:
             if tree.operation_type == '2_num':
                 return self.operation[tree.name](tree.left, tree.right, tree.num)
 
-    def change_data(self, tree, p=0.7):
+    def test_formula(self, formula):
         """
-        :param tree: 需要被改变叶子节点数据的树
-        :param p: 每个数据单独被改变的概率
-        :return: 没有返回值，直接修改
+        :param formula: 需要测试的因子表达式，如果是字符串形式，需要先解析成树
+        :return: 返回统计值以及该因子产生的信号矩阵 
         """
-        if tree.variable_type == 'data':
-            if np.random.uniform() < p:
-                if type(tree.name) == np.int64:
-                    if tree.father_name in []:
-                        pass
-                    else:
-                        pass
-                else:
-                    tree.name = np.random.choice(self.datas)[0]
-        else:
-            if tree.left in not None:
-                self.change_data(tree.left)
-            if tree.num in not None:
-                self.change_data(tree.num)
-            if tree.right in not None:
-                self.change_data(tree.right)
+
+
+
 
 

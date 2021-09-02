@@ -6,7 +6,7 @@ FormulaTree类定义了公式树变异的方法
 
 
 class Node:
-    def __init__(self, name, variable_type, operation_type,
+    def __init__(self, name, variable_type, operation_type=None,
                  left=None, right=None, num=None):
         """
         :param name: 操作或者数据的名字
@@ -49,6 +49,9 @@ class FormulaTree:
                               '2': ['add', 'prod', 'minus', 'div'],
                               '2_num': ['tscorr']}
 
+        self.p = {'1': [1/2, 1/2], '1_num': [1/15, 4/15, 2/15, 2/15, 2/15, 2/15, 1/15, 1/15],
+                  '2': [1/7, 3/7, 1/7, 2/7], '2_num': [1]}  # 不同操作被选中的概率
+
     def init_tree(self, height, symmetric=False):
         """
         :param height: 树的高度
@@ -57,7 +60,7 @@ class FormulaTree:
         """
         operation_type = np.random.choice(['1', '1_num', '2', '2_num'],
                                           p=[1 / 10, 4 / 10, 4 / 10, 1 / 10])[0]
-        operation = np.random.choice(self.operation_dic[operation_type])[0]  # 随机选取一个操作
+        operation = np.random.choice(self.operation_dic[operation_type], 1, p=self.p[operation_type])[0]  # 随机选取一个操作
         node = Node(name=operation, variable_type='operation', operation_type=operation_type)  # 无论如何先生成一个节点
         node.height = height  # 需要记录该节点代表的树的深度，以便之后的树的变异方法的使用
         if height == 1:  # 如果高度是1，直接生成叶子节点就可以返回
@@ -111,14 +114,42 @@ class FormulaTree:
                         node.left = self.init_tree(left_height, symmetric=symmetric)
                     if operation_type == '2_num':
                         if operation in ['tsdelta', 'tsdelay']:
-                            num = np.random.choice([i for i in range(1, 11)], p=[(15 - i) / 95 for i in range(1, 11)])[
+                            num = np.random.choice([i for i in range(1, 11)],
+                                                   p=[(15 - i) / 95 for i in range(1, 11)])[
                                 0]
                         else:
-                            num = np.random.choice([i for i in range(2, 32)], p=[(32 - i) / 480 for i in range(2, 32)])[
+                            num = np.random.choice([i for i in range(2, 32)],
+                                                   p=[(32 - i) / 480 for i in range(2, 32)])[
                                 0]
                         node.num = Node(name=num, variable_type='data')
                         node.num.father_name = operation
                 return node
 
+    def change_data(self, tree, p=0.7):
+        """
+        :param tree: 需要被改变叶子节点数据的树
+        :param p: 每个数据单独被改变的概率
+        :return: 没有返回值，直接修改
+        """
+        if tree.variable_type == 'data':
+            if np.random.uniform() < p:
+                if type(tree.name) == np.int64:
+                    if node.father_name in ['tscorr', 'tsmean', 'tskurtosis', 'tsskew', 'tsrank']:  # 根据父节点的操作类型决定数据范围
+                        node.name = 1 + np.random.choice([i for i in range(1, 31)], 1,
+                                                         p=[(31 - i + 10) / 765 for i in range(1, 31)])[0]
+                    else:
+                        node.name = 1 + np.random.choice([i for i in range(1, 11)], 1,
+                                                         p=[(11 - i + 4) / 95 for i in range(1, 11)])[0]
+                else:
+                    tree.name = np.random.choice(self.datas)[0]
+        else:
+            if tree.left in not None:
+                self.change_data(tree.left, p=p)
+            if tree.num in not None:
+                self.change_data(tree.num, p=p)
+            if tree.right in not None:
+                self.change_data(tree.right, p=p)
+
     def change_structure(self):  # 改变树的结构，可以选择是否局部更改
+        pass
 
