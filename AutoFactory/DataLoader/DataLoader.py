@@ -23,6 +23,16 @@ from jqdatasdk import *
 import datetime
 
 
+class Data:
+    def __init__(self, codes_order_dic, date_position_dic, data_dic, ret, start_date, end_date):
+        self.codes_order_dic = codes_order_dic
+        self.date_position_dic = date_position_dic
+        self.data_dic = data_dic
+        self.ret = ret
+        self.start_date = start_date
+        self.end_date = end_date
+
+
 class DataLoader:
     def __init__(self, user_id, password, data_path='F:/Documents/AutoFactoryData',
                  back_test_data_path='F:/Documents/AutoFactoryData/BackTestData'):
@@ -127,6 +137,8 @@ class DataLoader:
            例如open_close_4表示周一开盘价到周五收盘价
     2021-08-31
     1. 向前回溯例天数，默认100天，然后还要获得一个日期和下标对应的字典，以确定回测时的对应
+    2021-09-02
+    1. get_matrix_data方法应当返回一个data，是一个Data类，包含了所需的调用信息，以后在各类之间交流信息更方便
     """
 
     def get_matrix_data(self, back_test_name='default', frequency='daily',
@@ -237,4 +249,5 @@ class DataLoader:
                     pickle.dump(data_dic, f)
                 with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(ret, f)
-                return codes_order_dic, date_position_dic, data_dic, ret
+                data = Data(codes_order_dic, date_position_dic, data_dic, ret, start_date, end_date)
+                return data

@@ -39,7 +39,7 @@ class AutoFactory:
         self.autoformula = AutoFormula
 
         self.dataloader = DataLoader()
-        self.codes_order_dic, self.date_position_dic, self.data_dic, self.ret = self.dataloader.get_matrix_data()
+        self.data = self.dataloader.get_matrix_data()
 
     def factortest(self, formula, start_date, end_date):  # 测试因子
         """

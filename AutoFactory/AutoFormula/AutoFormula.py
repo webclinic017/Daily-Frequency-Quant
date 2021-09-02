@@ -12,9 +12,17 @@ from SignalGenerator import SignalGenerator
 
 
 class AutoFormula:
-    def __init__(self, height=3, symmetric=False):
+    def __init__(self, start_date, end_date, height=3, symmetric=False):
+        """
+        :param start_date: 该公式树
+        :param end_date:
+        :param height:
+        :param symmetric:
+        """
         self.height = height
         self.symmetric = symmetric
+        self.start_date = start_date
+        self.end_date = end_date
         self.tree = FormulaTree()
         self.tree.init_tree(height=self.height, symmetric=self.symmetric)
         self.operation = SignalGenerator()
@@ -37,12 +45,14 @@ class AutoFormula:
             if tree.operation_type == '2_num':
                 return self.operation[tree.name](tree.left, tree.right, tree.num)
 
-    def test_formula(self, formula):
+    def test_formula(self, formula, data_dic, ):
         """
         :param formula: 需要测试的因子表达式，如果是字符串形式，需要先解析成树
-        :return: 返回统计值以及该因子产生的信号矩阵 
+        :return: 返回统计值以及该因子产生的信号矩阵
         """
-
+        if type(formula) == str:
+            formula = self.formulatotree(formula)
+        signal = self.cal_formula(formula, data_dic)
 
 
 
