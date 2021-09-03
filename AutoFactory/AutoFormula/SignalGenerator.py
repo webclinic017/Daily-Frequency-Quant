@@ -7,11 +7,13 @@ v1.0
 """
 
 import numba as nb
+import numpy as np
 
 
 class SignalGenerator:
     def __init__(self):
         self.operation_dic = {}
+        self.get_operation()
 
     def get_operation(self):
         """
@@ -41,6 +43,7 @@ class SignalGenerator:
             c = a / b
             c[np.isnan(c)] = 0
             c[np.isinf(c)] = 0
+            return c
         self.operation_dic['div'] = div
 
         @nb.jit
@@ -58,7 +61,7 @@ class SignalGenerator:
         def tsdelay(a, num):
             s = np.zeros(a.shape)
             s[num:] = a[:-num].copy()
-            return a
+            return s
         self.operation_dic['tsdelay'] = tsdelay
 
         def tsdelta(a, num):
@@ -137,7 +140,6 @@ class SignalGenerator:
                     s[i, j] = np.sum(w * (a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))) / \
                               np.std(a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))
             return s
-
         self.operation_dic['wdirect'] = wdirect
 
         @nb.jit

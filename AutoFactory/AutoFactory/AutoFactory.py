@@ -14,45 +14,55 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 3. Tester文件夹下定义的类都是和信号评价相关的类，因此所有和信号相关的方法都应该在里面定义
 4. Model文件夹下定义的类都是和模型线相关的
 """
-
+import numpy as np
 import sys
 
-sys.path.append('../Tester')
-sys.path.append('../DataLoader')
-sys.path.append('../AutoFormula')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Tester/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/DataLoader/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/AutoFormula/')
 
-import BackTester
-import FactorTester
-import DataLoader
-import AutoFormula
+from DataLoader import DataLoader
+from BackTester import BackTester
+from AutoFormula import AutoFormula
 
 
 class AutoFactory:
-    def __init__(self, start_date, end_date):
+    def __init__(self, user_id, password, start_date, end_date):
         """
+        :param user_id: 登录聚宽的用户id
+        :param password: 登录密码
         :param start_date: 总体的开始日期
         :param end_date: 总体的结束日期
         """
         self.start_date = start_date
         self.end_date = end_date
         self.back_tester = BackTester()  # 模拟交易回测
-        self.autoformula = AutoFormula
+        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date)
 
-        self.dataloader = DataLoader()
-        self.data = self.dataloader.get_matrix_data()
+        self.dataloader = DataLoader(user_id, password)
+        self.data = self.dataloader.get_matrix_data(start_date=start_date, end_date=end_date)
 
-    def factortest(self, formula, start_date, end_date):  # 测试因子
+    def test_factor(self, formula, start_date=None, end_date=None):  # 测试因子
         """
         :param formula: 回测的公式
         :param start_date: 回测开始日期
         :param end_date: 回测结束日期
-        :return: 无返回值
+        :return: 返回统计类的实例
         """
+        if start_date is None:
+            start_date = self.start_date
+        if end_date is None:
+            end_date = self.end_date
+        stats = self.autoformula.test_formula(formula, self.data, start_date, end_date)
+        # return stats,s,e
+        print('mean IC: {:.4f}, auto_corr: {:.4f}, positive_IC_rate: {:.4f}, IC_IR: {:.4f}'.\
+              format(stats.mean_IC, stats.auto_corr, stats.positive_IC_rate, stats.IC_IR))
 
-        self.autoformula.test_formula(formula, start_date, end_date)
-
-    def backtest(self, signal, start_date, end_date):
-        pass
+    def backtest(self, signal, start_date=None, end_date=None):
+        if start_date is None:
+            start_date = self.start_date
+        if end_date is None:
+            end_date = self.end_date
 
     def stock_predict(self):
         pass

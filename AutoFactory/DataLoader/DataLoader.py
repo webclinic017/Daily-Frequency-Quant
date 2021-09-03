@@ -24,8 +24,8 @@ import datetime
 
 
 class Data:
-    def __init__(self, codes_order_dic, date_position_dic, data_dic, ret, start_date, end_date):
-        self.codes_order_dic = codes_order_dic
+    def __init__(self, code_order_dic, date_position_dic, data_dic, ret, start_date, end_date):
+        self.code_order_dic = code_order_dic
         self.date_position_dic = date_position_dic
         self.data_dic = data_dic
         self.ret = ret
@@ -142,7 +142,7 @@ class DataLoader:
     """
 
     def get_matrix_data(self, back_test_name='default', frequency='daily',
-                        start_date='2021-01-01', end_date='2021-06-30', back_windows=100,
+                        start_date='2021-01-01', end_date='2021-06-30', back_windows=10,
                         return_type='open_close_4'):
         """
         :param back_test_name: 该回测的名字
@@ -167,7 +167,7 @@ class DataLoader:
             if 'code_order_dic.pkl' not in lst:  # code_order_dic用于存储该回测区间内出现过的股票代码到矩阵位置的映射
                 print('getting data...')
                 dates = os.listdir('{}/StockDailyData'.format(self.data_path))
-                codes_order_dic = {}
+                code_order_dic = {}
                 order = 0
                 days = 0
                 date_position_dic = {}  # 记录日期对应到数据矩阵的位置
@@ -181,16 +181,18 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
+                            if len(data) == 0:
+                                continue
                             codes = list(data['code'])
                             for code in codes:
                                 try:
-                                    codes_order_dic[code]
+                                    code_order_dic[code]
                                 except KeyError:  # 代码规范：最好写明具体的错误类型
-                                    codes_order_dic[code] = order
+                                    code_order_dic[code] = order
                                     order += 1
                         days += 1
                 with open('{}/{}/code_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
-                    pickle.dump(codes_order_dic, f)
+                    pickle.dump(code_order_dic, f)
                 with open('{}/{}/date_position_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(date_position_dic, f)
 
@@ -201,9 +203,9 @@ class DataLoader:
                          'net_pct_main', 'net_pct_xl', 'net_pct_l', 'net_pct_m', 'net_pct_s']
                 data_dic = {}
                 for name in names:
-                    data_dic[name] = np.zeros((days, len(codes_order_dic)))
+                    data_dic[name] = np.zeros((days, len(code_order_dic)))
 
-                ret = np.zeros((days, len(codes_order_dic)))
+                ret = np.zeros((days, len(code_order_dic)))
                 start_name = return_type.split('_')[0]
                 end_name = return_type.split('_')[1]
 
@@ -218,10 +220,10 @@ class DataLoader:
                             data = pickle.load(file)
                             if len(data) == 0:
                                 continue
-                            index = list(data.index)
+                            index = list(data['code'])
                             for j in range(len(data)):
                                 for name in names[:5]:
-                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                                    data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
 
                         with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
                                                                                    date, date), 'rb') as file:
@@ -230,7 +232,7 @@ class DataLoader:
                             for j in range(len(data)):
                                 for name in names[5:6]:
                                     try:
-                                        data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                                        data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
                                     except KeyError:
                                         pass
 
@@ -240,7 +242,7 @@ class DataLoader:
                             index = list(data.index)
                             for j in range(len(data)):
                                 for name in names[6:]:
-                                    data_dic[name][k, codes_order_dic[index[j]]] = data[name].iloc[j]
+                                    data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
                         print('{} done.'.format(date))
                         k += 1
                 ret[:-length] = data_dic[end_name][length:] / data_dic[start_name][:-length] - 1
@@ -249,5 +251,16 @@ class DataLoader:
                     pickle.dump(data_dic, f)
                 with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(ret, f)
-                data = Data(codes_order_dic, date_position_dic, data_dic, ret, start_date, end_date)
+                data = Data(code_order_dic, date_position_dic, data_dic, ret, start_date, end_date)
+                return data
+            else:
+                with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    data_dic = pickle.load(f)
+                with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    ret = pickle.load(f)
+                with open('{}/{}/code_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    code_order_dic = pickle.load(f)
+                with open('{}/{}/date_position_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    date_position_dic = pickle.load(f)
+                data = Data(code_order_dic, date_position_dic, data_dic, ret, start_date, end_date)
                 return data

@@ -21,12 +21,21 @@ class Stats:
         self.positive_IC_rate = 0
 
 
-class AutoTest:
+class AutoTester:
     def __init__(self):
         pass
 
     @staticmethod
-    def test(signal, ret, orders):
+    def test(signal, ret, orders=None):
+        """
+        :param signal: 信号矩阵
+        :param ret: 和信号矩阵形状一致的收益率矩阵，意味着同一个时间维度已经做了delay
+        :param orders: 每个时间截面上进入截面的股票位置
+        :return: 返回Stats类的实例
+        """
+        signal[np.isnan(signal)] = 0
+        if orders is None:
+            orders = signal != 0
         ics = []
         auto_corr = []
         assert len(signal) == len(ret)
