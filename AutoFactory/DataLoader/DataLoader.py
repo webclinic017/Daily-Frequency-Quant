@@ -190,8 +190,8 @@ class DataLoader:
                 days = 0
                 date_position_dic = {}  # 记录日期对应到数据矩阵的位置
                 length = int(return_type.split('_')[-1])  # 表示需要延后几天以获得对应的收益
-                for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
-                    date = start_date + datetime.timedelta(days=i)
+                for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1 + 2):
+                    date = start_date + datetime.timedelta(days=i)  # 这里有bug要修复，万一延后的两天是周末，就有问题。加两天保险
                     if date.weekday() in [5, 6]:  # 周末略过
                         continue
                     if str(date) in dates:

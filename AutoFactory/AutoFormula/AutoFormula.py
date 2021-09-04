@@ -89,9 +89,9 @@ class AutoFormula:
         i = 0
 
         if start_date is None:
-            start_date = data.start_date
+            start_date = str(data.start_date)
         if end_date is None:
-            end_date = data.end_date
+            end_date = str(data.end_date)
 
         tmp_start = start_date.split('-')
         while True:
