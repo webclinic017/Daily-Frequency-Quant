@@ -41,10 +41,11 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         self.signals_dic = signals_dic
         print('done.')
 
-    def construct(self, start_date=None, end_date=None):
+    def construct(self, start_date=None, end_date=None, zscore=True):
         """
         :param start_date: 数据开始日期
         :param end_date: 数据结束日期
+        :param zscore: 是否截面标准化，默认需要
         :return: 返回一个np.array形式的X，Y
         """
         if start_date is None:
@@ -52,17 +53,31 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         if end_date is None:
             end_date = self.data.end_date
 
-        start = self.data.data_position_dic[start_date]
-        end = self.data.data_position_dic[end_date]
+        start = self.data.date_position_dic[start_date]
+        end = self.data.date_position_dic[end_date]
 
         x = []
         y = []
         for i in range(start, end + 1):
             x_tmp = []
             for j in self.signals_dic.keys():
-                x_tmp.append(self.signals_dic[j][self.top[i]])
+                tmp = self.signals_dic[j][i, self.data.top[i]].copy()
+                if zscore:
+                    tmp -= np.mean(tmp)
+                    if np.sum(tmp != 0) >= 2:
+                        tmp /= np.std(tmp)
+                    tmp[tmp > 3] = 3
+                    tmp[tmp < -3] = -3
+                x_tmp.append(tmp)
             x.append(np.vstack(x_tmp).T)
-            y.append(self.ret[self.top[i]])
+            y_tmp = self.data.ret[i+self.shift, self.data.top[i]].copy()  # 做shift
+            if zscore:
+                y_tmp -= np.mean(y_tmp)
+                if np.sum(y_tmp != 0) >= 2:
+                    y_tmp /= np.std(y_tmp)
+                y_tmp[y_tmp > 3] = 3
+                y_tmp[y_tmp < -3] = -3
+            y.append(y_tmp)
         x = np.vstack(x)
         y = np.hstack(y)
         return x, y

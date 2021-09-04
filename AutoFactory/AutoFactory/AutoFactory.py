@@ -22,14 +22,16 @@ import pickle
 sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Tester/')
 sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/DataLoader/')
 sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/AutoFormula/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Model/')
 
 from DataLoader import DataLoader
 from BackTester import BackTester
 from AutoFormula import AutoFormula
+import Model
 
 
 class AutoFactory:
-    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None):
+    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None, return_type='open_close_4'):
         """
         :param user_id: 登录聚宽的用户id
         :param password: 登录密码
@@ -40,7 +42,8 @@ class AutoFactory:
         self.start_date = start_date
         self.end_date = end_date
         self.dataloader = DataLoader(user_id, password)
-        self.data = self.dataloader.get_matrix_data(start_date=start_date, end_date=end_date)
+        self.data = self.dataloader.get_matrix_data(start_date=start_date,
+                                                    end_date=end_date, return_type=return_type)
         self.back_tester = BackTester()  # 模拟交易回测
         self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, top=self.data.top)
 
