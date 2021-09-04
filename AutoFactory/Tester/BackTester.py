@@ -17,6 +17,8 @@ class BackTester:
         self.data = data
         self.pnl = []  # pnl序列
         self.cumulated_pnl = []  # 累计pnl
+        self.market_pnl = []  # 如果纯多头，这里存市场的pnl，以比较超额收益
+        self.market_cumulated_pnl = []
 
     def long_short(self, start_date=None, end_date=None, n=0):  # 多空策略
         """
@@ -27,29 +29,15 @@ class BackTester:
         """
         self.pnl = []
         self.cumulated_pnl = []
+        self.market_pnl = []
+        self.market_cumulated_pnl = []
 
         if start_date is None:
             start_date = str(self.data.start_date)
         if end_date is None:
             end_date = str(self.data.end_date)
-        tmp_start = start_date.split('-')
-        i = 0
-        while True:
-            s = datetime.date(int(tmp_start[0]), int(tmp_start[1]), int(tmp_start[2])) + datetime.timedelta(days=i)
-            try:
-                start = self.data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
-        i = 0
-        tmp_end = end_date.split('-')
-        while True:
-            s = datetime.date(int(tmp_end[0]), int(tmp_end[1]), int(tmp_end[2])) + datetime.timedelta(days=i)
-            try:
-                end = self.data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
+
+        start, end = self.data.get_real_date(start_date, end_date)
 
         if n != 0:  # 暂时不管
             return
@@ -64,11 +52,50 @@ class BackTester:
                     self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
                                                                                            self.data.top[i]]) / 2)
                 else:
-                    self.cumulated_pnl.append(self.cumulated_pnl[-1] \
-                                              + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
-                                                                                             self.data.top[i]]) / 2)
+                    self.cumulated_pnl.append(
+                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
+                                                                                              self.data.top[i]]) / 2)
 
-    def gen_signal(self, model, signals_dic, start_date=None, end_date=None):
+    def long_top_n(self, start_date=None, end_date=None, n=0):  # 做多预测得分最高的n只股票
+        """
+        :param start_date: 开始日期
+        :param end_date: 结束日期
+        :param n: 做多多少只股票，默认按照top做多
+        :return:
+        """
+        self.pnl = []
+        self.cumulated_pnl = []
+        self.market_pnl = []
+        self.market_cumulated_pnl = []
+
+        if start_date is None:
+            start_date = str(self.data.start_date)
+        if end_date is None:
+            end_date = str(self.data.end_date)
+
+        start, end = self.data.get_real_date(start_date, end_date)
+        if n != 0:  # 暂时不管
+            return
+        else:
+            for i in range(start, end + 1):
+                tmp = self.signal[i].copy()
+                tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
+                tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
+                tmp[self.data.top[i] & (tmp < 0)] = 0
+                self.pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1, self.data.top[i]]))
+                self.market_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                if not self.cumulated_pnl:
+                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
+                                                                                           self.data.top[i]]))
+                    self.market_cumulated_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                else:
+                    self.cumulated_pnl.append(
+                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
+                                                                                              self.data.top[i]]))
+                    self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
+                                                     np.mean(self.data.ret[i + 1, self.data.top[i]]))
+
+    def generate_signal(self, model, signals_dic, start_date=None, end_date=None):
         """
         :param model: 一个模型
         :param signals_dic: 使用的原始信号字典
@@ -83,27 +110,7 @@ class BackTester:
             end_date = str(self.data.end_date)
         signal = np.zeros(self.data.data_dic['close'].shape)
 
-        """
-        这段代码重复了，需要包装成一个函数
-        """
-        i = 0
-        tmp_start = start_date.split('-')
-        while True:
-            s = datetime.date(int(tmp_start[0]), int(tmp_start[1]), int(tmp_start[2])) + datetime.timedelta(days=i)
-            try:
-                start = self.data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
-        i = 0
-        tmp_end = end_date.split('-')
-        while True:
-            s = datetime.date(int(tmp_end[0]), int(tmp_end[1]), int(tmp_end[2])) + datetime.timedelta(days=i)
-            try:
-                end = self.data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
+        start, end = self.data.get_real_date(start_date, end_date)
 
         for i in range(start, end + 1):
             tmp_x = []
@@ -120,3 +127,4 @@ class BackTester:
         self.signal = signal
 
         return signal
+

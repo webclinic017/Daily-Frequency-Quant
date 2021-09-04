@@ -44,7 +44,7 @@ class AutoFactory:
         self.dataloader = DataLoader(user_id, password)
         self.data = self.dataloader.get_matrix_data(start_date=start_date,
                                                     end_date=end_date, return_type=return_type)
-        self.back_tester = BackTester()  # 模拟交易回测
+        self.back_tester = BackTester(data=self.data)  # 模拟交易回测
         self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, top=self.data.top)
 
         if dump_signal_path is None:

@@ -15,6 +15,7 @@ v1.0
 
 2021-09-04
 -- 更新：get_matrix_data方法返回的Data类还要包括factor和位置到股票位置的映射
+-- 更新：Data类新增根据输入起始日期找到有交易的最近的两个真正的起始日期并返回的方法
 """
 
 import numpy as np
@@ -47,6 +48,31 @@ class Data:
         self.end_date = end_date
         self.top = top
 
+    def get_real_date(self, start_date, end_date):
+        """
+        :param start_date: 任意输入的开始日期
+        :param end_date: 任意输入的结束日期
+        :return: 返回有交易的真正的起始日期对应的下标
+        """
+        tmp_start = start_date.split('-')
+        i = 0
+        while True:
+            s = datetime.date(int(tmp_start[0]), int(tmp_start[1]), int(tmp_start[2])) + datetime.timedelta(days=i)
+            try:
+                start = self.date_position_dic[s]
+                break
+            except KeyError:
+                i += 1
+        i = 0
+        tmp_end = end_date.split('-')
+        while True:
+            s = datetime.date(int(tmp_end[0]), int(tmp_end[1]), int(tmp_end[2])) + datetime.timedelta(days=i)
+            try:
+                end = self.date_position_dic[s]
+                break
+            except KeyError:
+                i += 1
+        return start, end
 
 class DataLoader:
     def __init__(self, user_id, password, data_path='F:/Documents/AutoFactoryData',
