@@ -30,7 +30,7 @@ class Node:
 
 class FormulaParser:
     def __init__(self):
-        self.operation_dic = {'1': ['csrank', 'zscore'],
+        self.operation_dic = {'1': ['csrank', 'zscore', 'neg'],
                               '1_num': ['wdirect', 'tsrank', 'tskurtosis', 'tsskew',
                                         'tsmean', 'tsstd', 'tsdelay', 'tsdelta'],
                               '2': ['add', 'prod', 'minus', 'div'],

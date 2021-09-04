@@ -11,49 +11,52 @@ import numpy as np
 
 
 class SignalGenerator:
-    def __init__(self):
+    def __init__(self, top):
+        """
+        :param top: 计算截面时需要使用
+        """
         self.operation_dic = {}
         self.get_operation()
+        self.top = top
+
+        self.operation_dic['zscore'] = self.zscore
+        self.operation_dic['csrank'] = self.csrank
+
+        """
+        截面算子，因为要调用top
+        """
+
+    def csrank(self, a):
+        b = a.copy()  # 测试用，可以不用复制
+        b[np.isnan(b)] = 0
+        for i in range(len(a)):
+            n = np.sum(b[i][self.top[i]] != 0)
+            if n == 0:
+                continue
+            tmp = b[i][self.top[i]].copy()
+            pos = tmp.argsort()
+            for j in range(len(tmp)):
+                tmp[pos[j]] = j
+            tmp /= (len(self.top[i]) - 1)
+            b[i][self.top[i]] = tmp
+        return b
+
+    def zscore(self, a):
+        b = a.copy()
+        b[np.isnan(b)] = 0
+        for i in range(len(a)):
+            if np.sum(b[i][self.top[i]] != 0) <= 1:
+                continue
+            b[i][self.top[i]] -= np.mean(b[i][self.top[i]])
+            b[i][self.top[i]] /= np.std(b[i][self.top[i]])
+            b[i][(self.top[i]) & (b[i] > 3)] = 3
+            b[i][(self.top[i]) & (b[i] < -3)] = -3
+        return b
 
     def get_operation(self):
-        """
-        定义算子
-        :return: 形状一致的矩阵，也就是signal
-        """
-
-        """
-        1型运算符
-        """
-        @nb.jit()
-        def csrank(a):
-            b = a.copy()  # 测试用，可以不用复制
-            for i in range(len(a)):
-                n = np.sum(a[i] != 0)
-                if n == 0:
-                    continue
-                tmp = a[i][a[i] != 0].copy()
-                pos = tmp.argsort()
-                for j in range(len(tmp)):
-                    tmp[pos[j]] = j
-                tmp /= (n - 1)
-                b[i][b[i] != 0] = tmp
-            return b
-
-        self.operation_dic['csrank'] = csrank
-
-        @nb.jit
-        def zscore(a):
-            b = copy()
-            for i in range(len(a)):
-                if np.sum(a[i] != 0) <= 1:
-                    continue
-                b[i][b[i] != 0] -= np.mean(b[i][b[i] != 0])
-                b[i][b[i] != 0] /= np.std(b[i][b[i] != 0])
-                b[i][b[i] > 3] = 3
-                b[i][b[i] < -1] = -3
-            return a
-
-        self.operation_dic['zscore'] = zscore
+        def neg(a):
+            return -a
+        self.operation_dic['neg'] = neg
 
         """
         1_num型运算符

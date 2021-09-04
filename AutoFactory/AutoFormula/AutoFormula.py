@@ -15,10 +15,11 @@ from SignalGenerator import SignalGenerator
 
 
 class AutoFormula:
-    def __init__(self, start_date, end_date, height=3, symmetric=False):
+    def __init__(self, start_date, end_date, top, height=3, symmetric=False):
         """
         :param start_date: 该公式树
         :param end_date:
+        :param top: 截面股票池
         :param height:
         :param symmetric:
         """
@@ -28,7 +29,7 @@ class AutoFormula:
         self.end_date = end_date
         self.tree_generator = FormulaTree()
         self.tree = self.tree_generator.init_tree(height=self.height, symmetric=self.symmetric)
-        self.operation = SignalGenerator()
+        self.operation = SignalGenerator(top=top)
         self.formula_parser = FormulaParser()
         self.AT = AutoTester()
 
