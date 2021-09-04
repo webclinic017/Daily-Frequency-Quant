@@ -53,10 +53,11 @@ class AutoFactory:
             start_date = self.start_date
         if end_date is None:
             end_date = self.end_date
-        stats = self.autoformula.test_formula(formula, self.data, start_date, end_date)
+        stats, signal = self.autoformula.test_formula(formula, self.data, start_date, end_date)
         # return stats,s,e
-        print('mean IC: {:.4f}, auto_corr: {:.4f}, positive_IC_rate: {:.4f}, IC_IR: {:.4f}'.\
+        print('mean IC: {:.4f}, auto_corr: {:.4f}, positive_IC_rate: {:.4f}, IC_IR: {:.4f}'. \
               format(stats.mean_IC, stats.auto_corr, stats.positive_IC_rate, stats.IC_IR))
+        return stats, signal
 
     def backtest(self, signal, start_date=None, end_date=None):
         if start_date is None:

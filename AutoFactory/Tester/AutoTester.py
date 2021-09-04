@@ -26,25 +26,25 @@ class AutoTester:
         pass
 
     @staticmethod
-    def test(signal, ret, orders=None):
+    def test(signal, ret, top=None):
         """
         :param signal: 信号矩阵
         :param ret: 和信号矩阵形状一致的收益率矩阵，意味着同一个时间维度已经做了delay
-        :param orders: 每个时间截面上进入截面的股票位置
+        :param top: 每个时间截面上进入截面的股票位置
         :return: 返回Stats类的实例
         """
         signal[np.isnan(signal)] = 0
-        if orders is None:
-            orders = signal != 0
+        if top is None:
+            top = signal != 0
         ics = []
         auto_corr = []
         assert len(signal) == len(ret)
-        assert len(signal) == len(orders)
+        assert len(signal) == len(top)
         for i in range(len(signal)):
-            ics.append(np.corrcoef(signal[i, orders[i]], ret[i, orders[i]])[0, 1])
+            ics.append(np.corrcoef(signal[i, top[i]], ret[i, top[i]])[0, 1])
             if i >= 1:
                 auto_corr.append(
-                    np.corrcoef(signal[i, orders[i] & orders[i - 1]], ret[i, orders[i] & orders[i - 1]])[0, 1])
+                    np.corrcoef(signal[i, top[i] & top[i - 1]], ret[i, top[i] & top[i - 1]])[0, 1])
 
         ics = np.array(ics)
         ics[np.isnan(ics)] = 0

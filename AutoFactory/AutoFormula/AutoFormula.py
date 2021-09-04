@@ -41,6 +41,8 @@ class AutoFormula:
         """
         if return_type == 'signal':
             if tree.variable_type == 'data':
+                if type(tree.name) == int or type(tree.name) == float:
+                    return tree.name
                 return data_dic[tree.name].copy()  # 当前版本需要返回一个副本
             else:
                 if tree.operation_type == '1':
@@ -72,17 +74,25 @@ class AutoFormula:
                            self.cal_formula(tree.right, data_dic, return_type) + ',' + \
                            self.cal_formula(tree.num, data_dic, return_type) + '}'
 
-    def test_formula(self, formula, data, start_date, end_date):
+    def test_formula(self, formula, data, start_date=None, end_date=None):
         """
         :param formula: 需要测试的因子表达式，如果是字符串形式，需要先解析成树
+        :param data: Data类
+        :param start_date: 如果不提供则按照Data类默认的来
+        :param end_date: 如果不提供则按照Data类默认的来
         :return: 返回统计值以及该因子产生的信号矩阵
         """
         if type(formula) == str:
             formula = self.formula_parser.parse(formula)
         signal = self.cal_formula(formula, data.data_dic)  # 暂时为了方便，无论如何都计算整个回测区间的因子值
         i = 0
-        tmp_start = start_date.split('-')
 
+        if start_date is None:
+            start_date = data.start_date
+        if end_date is None:
+            end_date = data.end_date
+
+        tmp_start = start_date.split('-')
         while True:
             s = datetime.date(int(tmp_start[0]), int(tmp_start[1]), int(tmp_start[2])) + datetime.timedelta(days=i)
             try:
@@ -100,4 +110,4 @@ class AutoFormula:
             except KeyError:
                 i += 1
         # return signal,start,end
-        return self.AT.test(signal[start:end + 1], data.ret[start + 1:end + 2])
+        return self.AT.test(signal[start:end + 1], data.ret[start + 1:end + 2], top=data.top[start:end + 1]), signal

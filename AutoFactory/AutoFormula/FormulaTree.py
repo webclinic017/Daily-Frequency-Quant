@@ -48,6 +48,13 @@ class FormulaParser:
         :return: 返回一棵树
         """
         if '{' not in s:
+            try:
+                s = int(s)
+            except ValueError:
+                try:
+                    s = float(s)
+                except ValueError:
+                    pass
             return Node(name=s, variable_type='data')
         else:
             # 定位到名称
