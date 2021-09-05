@@ -59,3 +59,38 @@ class AutoTester:
             stats.IC_IR = np.mean(ics) / np.std(ics)
         stats.positive_IC_rate = np.sum(ics > 0) / len(ics)
         return stats
+
+    @staticmethod
+    def cal_bin_ret(signal, ret, top=None):
+        signal[np.isnan(signal)] = 0
+        if top is None:
+            top = signal != 0
+        cell = 20
+        z = [[] for i in range(cell)]
+        r = [[] for i in range(cell)]
+
+        for i in range(len(signal)):
+            tmp = signal[i].copy()
+            tmp[top[i]] -= np.mean(tmp[top[i]])
+            tmp_ret = ret[i].copy()
+            tmp_ret[np.isnan(tmp_ret)] = 0
+            tmp_ret[top[i]] -= np.mean(tmp_ret[top[i]])
+            tmp[top[i]] /= np.std(tmp[top[i]])
+            tmp[np.isnan(tmp)] = 0
+            # 放入分组
+            signal_ret = []
+            for j in range(len(tmp[top[i]])):
+                signal_ret.append((tmp[top[i]][j], tmp_ret[top[i]][j]))
+                signal_ret = sorted(signal_ret)
+            pos = 0
+            while pos < cell:
+                if pos < cell - 1:
+                    for j in range(len(signal_ret) // cell * pos, len(signal_ret) // cell * (pos + 1)):
+                        z[pos].append(signal_ret[j][0])
+                        r[pos].append(signal_ret[j][1])
+                else:
+                    for j in range(len(signal_ret) // cell * pos, len(signal_ret)):
+                        z[pos].append(signal_ret[j][0])
+                        r[pos].append(signal_ret[j][1])
+                pos += 1
+        return z, r

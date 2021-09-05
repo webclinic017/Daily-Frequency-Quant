@@ -5,6 +5,7 @@ Model是若干个定义了多种标准化以及结构化的模型框架，可以
 """
 from sklearn import linear_model
 import numpy as np
+import pickle
 
 
 class Model:
@@ -22,7 +23,7 @@ class Model:
         :return:
         """
         if model is None or model == 'Lasso':  # 默认使用LASSO
-            self.model = sklearn.linear_model.Lasso(alpha=5e-4)
+            self.model = linear_model.Lasso(alpha=5e-4)
             print('there are {} factors'.format(x_train.shape[1]))
             self.model.fit(x_train, y_train)
             print('{} factors have been selected'.format(np.sum(self.model.coef_ != 0)))
@@ -42,3 +43,7 @@ class Model:
         else:
             self.model = model
         pass
+
+    def dump_model(self, model_name):  # 保存模型
+        with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'wb') as file:
+            pickle.dump(self.model, file)

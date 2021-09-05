@@ -75,40 +75,29 @@ class AutoFormula:
                            self.cal_formula(tree.right, data_dic, return_type) + ',' + \
                            self.cal_formula(tree.num, data_dic, return_type) + '}'
 
-    def test_formula(self, formula, data, start_date=None, end_date=None):
+    def test_formula(self, formula, data, start_date=None, end_date=None, prediction_mode=False):
         """
         :param formula: 需要测试的因子表达式，如果是字符串形式，需要先解析成树
         :param data: Data类
         :param start_date: 如果不提供则按照Data类默认的来
         :param end_date: 如果不提供则按照Data类默认的来
+        :param prediction_mode: 是否是最新预测模式，是的话不需要测试，只生成signal
         :return: 返回统计值以及该因子产生的信号矩阵
         """
-        if type(formula) == str:
-            formula = self.formula_parser.parse(formula)
-        signal = self.cal_formula(formula, data.data_dic)  # 暂时为了方便，无论如何都计算整个回测区间的因子值
-        i = 0
+        if not prediction_mode:
+            if type(formula) == str:
+                formula = self.formula_parser.parse(formula)
+            signal = self.cal_formula(formula, data.data_dic)  # 暂时为了方便，无论如何都计算整个回测区间的因子值
 
-        if start_date is None:
-            start_date = str(data.start_date)
-        if end_date is None:
-            end_date = str(data.end_date)
+            if start_date is None:
+                start_date = str(data.start_date)
+            if end_date is None:
+                end_date = str(data.end_date)
 
-        tmp_start = start_date.split('-')
-        while True:
-            s = datetime.date(int(tmp_start[0]), int(tmp_start[1]), int(tmp_start[2])) + datetime.timedelta(days=i)
-            try:
-                start = data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
-        i = 0
-        tmp_end = end_date.split('-')
-        while True:
-            s = datetime.date(int(tmp_end[0]), int(tmp_end[1]), int(tmp_end[2])) + datetime.timedelta(days=i)
-            try:
-                end = data.date_position_dic[s]
-                break
-            except KeyError:
-                i += 1
-        # return signal,start,end
-        return self.AT.test(signal[start:end + 1], data.ret[start + 1:end + 2], top=data.top[start:end + 1]), signal
+            start, end = data.get_real_date(start_date, end_date)
+            # return signal,start,end
+            return self.AT.test(signal[start:end + 1], data.ret[start + 1:end + 2], top=data.top[start:end + 1]), signal
+        else:
+            if type(formula) == str:
+                formula = self.formula_parser.parse(formula)
+            return self.cal_formula(formula, data.data_dic)

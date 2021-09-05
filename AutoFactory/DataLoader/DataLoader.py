@@ -16,6 +16,9 @@ v1.0
 2021-09-04
 -- 更新：get_matrix_data方法返回的Data类还要包括factor和位置到股票位置的映射
 -- 更新：Data类新增根据输入起始日期找到有交易的最近的两个真正的起始日期并返回的方法
+
+2021-09-05
+-- 更新：Data类新增position_date_dic属性，用于检测每一个交易日给出的股票仓位
 """
 
 import numpy as np
@@ -27,7 +30,7 @@ import datetime
 
 
 class Data:
-    def __init__(self, code_order_dic, order_code_dic, date_position_dic,
+    def __init__(self, code_order_dic, order_code_dic, date_position_dic, position_date_dic,
                  data_dic, ret, start_date, end_date, top):
         """
         :param code_order_dic: 股票代码到矩阵位置的字典
@@ -42,6 +45,7 @@ class Data:
         self.code_order_dic = code_order_dic
         self.order_code_dic = order_code_dic
         self.date_position_dic = date_position_dic
+        self.position_date_dic = position_date_dic
         self.data_dic = data_dic
         self.ret = ret
         self.start_date = start_date
@@ -71,8 +75,9 @@ class Data:
                 end = self.date_position_dic[s]
                 break
             except KeyError:
-                i += 1
+                i -= 1
         return start, end
+
 
 class DataLoader:
     def __init__(self, user_id, password, data_path='F:/Documents/AutoFactoryData',
@@ -143,13 +148,18 @@ class DataLoader:
                     pickle.dump(stock_data, f)
                 print('{} done.'.format(date))
 
-        """
         if 'index_daily' in data_type:
-            all_indexes = get_all_securities(types=['index'], date=date)
-            with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                pickle.dump(all_indexes, f)
-        
+            begin = datetime.date(int(start_date[0]), int(start_date[1]), int(start_date[2]))
+            end = datetime.date(int(end_date[0]), int(end_date[1]), int(end_date[2]))
+            for i in range((end - begin).days + 1):
+                date = begin + datetime.timedelta(days=i)
+                if date.weekday() in [5, 6]:  # 略过周末
+                    continue
+                all_indexes = get_all_securities(types=['index'], date=date)
+                with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
+                    pickle.dump(all_indexes, f)
 
+        """
         if 'minute' in data_type:
             lst = os.listdir('{}/StockIntraDayData'.format(self.data_path))
             if date not in lst:
@@ -215,6 +225,7 @@ class DataLoader:
                 order = 0
                 days = 0
                 date_position_dic = {}  # 记录日期对应到数据矩阵的位置
+                position_date_dic = {}  # 记录对应数据矩阵位置到日期的映射
                 length = int(return_type.split('_')[-1])  # 表示需要延后几天以获得对应的收益
                 for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1 + 2):
                     date = start_date + datetime.timedelta(days=i)  # 这里有bug要修复，万一延后的两天是周末，就有问题。加两天保险
@@ -222,6 +233,7 @@ class DataLoader:
                         continue
                     if str(date) in dates:
                         date_position_dic[date] = days  # 这个日期对应的矩阵第几行
+                        position_date_dic[days] = date  # 第几行对应的是哪一天的日期
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
@@ -244,6 +256,8 @@ class DataLoader:
                     pickle.dump(order_code_dic, f)
                 with open('{}/{}/date_position_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(date_position_dic, f)
+                with open('{}/{}/position_date_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(position_date_dic, f)
 
                 """
                 获得数据字典
@@ -321,7 +335,7 @@ class DataLoader:
                     pickle.dump(ret, f)
                 with open('{}/{}/top.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(top, f)
-                data = Data(code_order_dic, order_code_dic, date_position_dic,
+                data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
                             data_dic, ret, start_date, end_date, top)
                 return data
             else:
@@ -336,8 +350,10 @@ class DataLoader:
                     order_code_dic = pickle.load(f)
                 with open('{}/{}/date_position_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
                     date_position_dic = pickle.load(f)
+                with open('{}/{}/position_date_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    position_date_dic = pickle.load(f)
                 with open('{}/{}/top.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
                     top = pickle.load(f)
-                data = Data(code_order_dic, order_code_dic, date_position_dic,
+                data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
                             data_dic, ret, start_date, end_date, top)
                 return data

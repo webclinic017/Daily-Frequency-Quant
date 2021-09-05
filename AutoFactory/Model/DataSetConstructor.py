@@ -49,18 +49,18 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         :return: 返回一个np.array形式的X，Y
         """
         if start_date is None:
-            start_date = self.data.start_date
+            start_date = str(self.data.start_date)
         if end_date is None:
-            end_date = self.data.end_date
+            end_date = str(self.data.end_date)
 
-        start = self.data.date_position_dic[start_date]
-        end = self.data.date_position_dic[end_date]
+        start, end = self.data.get_real_date(start_date, end_date)
 
         x = []
         y = []
         for i in range(start, end + 1):
             x_tmp = []
             for j in self.signals_dic.keys():
+
                 tmp = self.signals_dic[j][i, self.data.top[i]].copy()
                 tmp[np.isnan(tmp)] = 0  # 需要处理异常值
                 if zscore:

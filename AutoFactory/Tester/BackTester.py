@@ -20,6 +20,8 @@ class BackTester:
         self.market_pnl = []  # 如果纯多头，这里存市场的pnl，以比较超额收益
         self.market_cumulated_pnl = []
 
+        self.log = []  # 记录每一个具体的交易日给出的股票
+
     def long_short(self, start_date=None, end_date=None, n=0):  # 多空策略
         """
         :param start_date: 开始日期
@@ -68,14 +70,51 @@ class BackTester:
         self.market_pnl = []
         self.market_cumulated_pnl = []
 
+        # 验证用功能：记录每一天具体的给出的股票代码和实际的收益率
+        self.log = []
+
         if start_date is None:
             start_date = str(self.data.start_date)
         if end_date is None:
             end_date = str(self.data.end_date)
 
         start, end = self.data.get_real_date(start_date, end_date)
-        if n != 0:  # 暂时不管
-            return
+
+        pos = np.array([i for i in range(len(self.data.top[0]))])  # 测试用
+        if n != 0:
+            for i in range(start, end + 1):
+                tmp = self.signal[i].copy()
+                tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
+                tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
+                tmp[self.data.top[i] & (tmp < 0)] = 0
+                a = tmp[self.data.top[i] & (tmp > 0)].argsort()[-n:]
+                self.log.append((self.data.position_date_dic[i],
+                                 self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][0]]))
+                """
+                self.pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
+                                       self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
+                                np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
+                """
+                self.pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                self.market_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                if not self.cumulated_pnl:
+                    """
+                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
+                                                     self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
+                                              np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
+                                              """
+                    self.cumulated_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                    self.market_cumulated_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                else:
+                    """
+                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
+                                                     self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
+                                              np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
+                                              """
+                    self.cumulated_pnl.append(self.cumulated_pnl[-1] +
+                                              np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                    self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
+                                                     np.mean(self.data.ret[i + 1, self.data.top[i]]))
         else:
             for i in range(start, end + 1):
                 tmp = self.signal[i].copy()
@@ -94,6 +133,24 @@ class BackTester:
                                                                                               self.data.top[i]]))
                     self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
+        return self.log
+
+    def long_stock_predict(self, n=1):  # 非回测模式，直接预测最新交易日的股票
+        """
+        :param n: 需要预测多少只股票
+        :return: 返回预测的股票代码以及他们的zscore分数
+        """
+        pos = np.array([i for i in range(len(self.data.top[0]))])
+        start, end = self.data.get_real_date(str(self.data.start_date), str(self.data.end_date))
+        for i in range(end, end + 1):
+            tmp = self.signal[i].copy()
+            tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
+            tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
+            tmp[self.data.top[i] & (tmp < 0)] = 0
+            a = tmp[self.data.top[i] & (tmp > 0)].argsort()[-n:]
+            return (self.data.position_date_dic[i],
+                    [self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][j]] for j in range(n)],
+                    tmp[self.data.top[i] & (tmp > 0)][a])
 
     def generate_signal(self, model, signals_dic, start_date=None, end_date=None):
         """
@@ -127,4 +184,3 @@ class BackTester:
         self.signal = signal
 
         return signal
-
