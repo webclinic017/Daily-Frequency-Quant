@@ -14,6 +14,12 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 3. Tester文件夹下定义的类都是和信号评价相关的类，因此所有和信号相关的方法都应该在里面定义，包括测试信号表现的
 4. Model文件夹下定义的类都是和模型定义相关的
 """
+
+"""
+开发日志
+2021-09-06
+-- 更新：使用预测函数时所需的信号放在内存中，不需要重复读取，除非以后有更加复杂的模型
+"""
 import numpy as np
 import sys
 import os
@@ -97,39 +103,36 @@ class AutoFactory:
         with open(path, 'a+') as f:
             f.write(factor + '\n')
 
-    def long_stock_predict(self, model_name, n=1):  # 每日推荐股票多头
+    def long_stock_predict(self, model_name, date=None, n=1):  # 每日推荐股票多头
         """
-        :param date: 用到多少天前的数据，默认以下一个交易日收盘价买入
         :param n: 推荐得分最高的n只股票
         :param model_name: 使用的模型
+        :param date: 预测哪一天
         :return: 直接打印结果
         """
-        date = str(self.data.end_date)  # 这里之后的版本要修改成更加灵活的读写信号，例如每天自动增量更新
+        if date is None:
+            date = str(self.data.end_date)  # 这里之后的版本要修改成更加灵活的读写信号，例如每天自动增量更新
         print('reading model...')
         with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'rb') as file:
             model = pickle.load(file)
+        print('getting signal...')
+        num = 0
+        signals_dic = {}
         with open('F:/Documents/AutoFactoryData/Factors/factors_pv_2020-11-01_2021-07-30.txt') as file:
             while True:
                 fml = file.readline().strip()
                 if not fml:
                     break
-                print(fml)
+                # print(fml)
                 signal = self.test_factor(fml, end_date=date, prediction_mode=True)
-                self.dump_factor(fml)
-                self.dump_signal(signal)
-        signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(self.data.start_date, self.end_date)
-
-        print('reading signal...')
-        signals_dic = {}
-        lst = os.listdir(signal_path)
-        num = 0
-        for s in lst:
-            with open('{}/{}'.format(signal_path, s), 'rb') as file:
-                tmp = pickle.load(file)
-                signals_dic[num] = tmp
-            num += 1
+                signals_dic[num] = signal
+                num += 1
+                # self.dump_factor(fml)
+                # self.dump_signal(signal)
+        # signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(self.data.start_date, self.end_date)
+        print('there are {} factors'.format(num))
         self.back_tester.generate_signal(model, signals_dic, end_date=date)
-        ll = self.back_tester.long_stock_predict(n=n)
+        ll = self.back_tester.long_stock_predict(date=date, n=n)
         print(ll)
 
     def train(self):

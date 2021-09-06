@@ -135,13 +135,17 @@ class BackTester:
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
         return self.log
 
-    def long_stock_predict(self, n=1):  # 非回测模式，直接预测最新交易日的股票
+    def long_stock_predict(self, date=None, n=1):  # 非回测模式，直接预测最新交易日的股票
         """
+        :param date: 预测的日期，默认是最新的日期
         :param n: 需要预测多少只股票
         :return: 返回预测的股票代码以及他们的zscore分数
         """
         pos = np.array([i for i in range(len(self.data.top[0]))])
-        start, end = self.data.get_real_date(str(self.data.start_date), str(self.data.end_date))
+        if date is None:
+            start, end = self.data.get_real_date(str(self.data.start_date), str(self.data.end_date))
+        else:
+            start, end = self.data.get_real_date(date, date)
         for i in range(end, end + 1):
             tmp = self.signal[i].copy()
             tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
