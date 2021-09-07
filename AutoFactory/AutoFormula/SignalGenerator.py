@@ -56,21 +56,25 @@ class SignalGenerator:
     def get_operation(self):
         def neg(a):
             return -a
+
         self.operation_dic['neg'] = neg
 
         """
         1_num型运算符
         """
+
         def tsdelay(a, num):
             s = np.zeros(a.shape)
             s[num:] = a[:-num].copy()
             return s
+
         self.operation_dic['tsdelay'] = tsdelay
 
         def tsdelta(a, num):
             s = np.zeros(a.shape)
             s[num:] = a[num:] - a[:-num]
             return a
+
         self.operation_dic['tsdelta'] = tsdelta
 
         @nb.jit
@@ -82,6 +86,7 @@ class SignalGenerator:
                 for j in range(a.shape[1]):
                     s[i, j] = np.std(a[i - num + 1:i + 1, j])
             return s
+
         self.operation_dic['tsstd'] = tsstd
 
         @nb.jit
@@ -93,6 +98,7 @@ class SignalGenerator:
                 for j in range(a.shape[1]):
                     s[i, j] = np.mean(a[i - num + 1:i + 1, j])
             return s
+
         self.operation_dic['tsmean'] = tsmean
 
         @nb.jit
@@ -102,9 +108,13 @@ class SignalGenerator:
                 if i < num - 1:
                     continue
                 for j in range(a.shape[1]):
-                    s[i, j] = np.mean((a[i - num + 1:i + 1, j] - np.mean(a[i - num + 1:i + 1, j])) ** 4) / \
-                              (np.std(a[i - num + 1:i + 1, j])) ** 4 - 3
+                    if np.std(a[i - num + 1:i + 1, j]) == 0:
+                        continue
+                    s[i, j] = np.mean((a[i - num + 1:i + 1,
+                                       j] - np.mean(a[i - num + 1:i + 1,
+                                                    j])) ** 4) / (np.std(a[i - num + 1:i + 1, j]) ** 4) - 3
             return s
+
         self.operation_dic['tskurtosis'] = tskurtosis
 
         @nb.jit
@@ -128,8 +138,10 @@ class SignalGenerator:
                 if i < num - 1:
                     continue
                 for j in range(a.shape[1]):
-                    s[i, j] = np.sum(w * (a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))) / \
-                              np.std(a[i - num + 1:i, j] - np.mean(a[i - num + 1:i, j]))
+                    if np.std(a[i - num + 1:i + 1, j]) == 0:
+                        continue
+                    s[i, j] = np.sum(w * (a[i - num + 1:i + 1, j] - np.mean(a[i - num + 1:i + 1, j]))) / \
+                              np.std(a[i - num + 1:i + 1, j])
             return s
 
         self.operation_dic['wdirect'] = wdirect
@@ -150,12 +162,15 @@ class SignalGenerator:
         """
         2型运算符
         """
+
         def add(a, b):
             return a + b
+
         self.operation_dic['add'] = add
 
         def minus(a, b):
             return a - b
+
         self.operation_dic['minus'] = minus
 
         def prod(a, b):
@@ -163,6 +178,7 @@ class SignalGenerator:
             c[np.isnan(c)] = 0
             c[np.isinf(c)] = 0
             return a * b
+
         self.operation_dic['prod'] = prod
 
         def div(a, b):
@@ -170,11 +186,13 @@ class SignalGenerator:
             c[np.isnan(c)] = 0
             c[np.isinf(c)] = 0
             return c
+
         self.operation_dic['div'] = div
 
         """
         2_num型运算符
         """
+
         @nb.jit
         def tscorr(a, b, num):
             s = np.zeros(a.shape)
@@ -190,6 +208,7 @@ class SignalGenerator:
         """
         1_num_num型运算符
         """
+
         @nb.jit
         def tsautocorr(a, delta, num):
             s = np.zeros(a.shape)
@@ -201,11 +220,3 @@ class SignalGenerator:
             return s
 
         self.operation_dic['tsautocorr'] = tsautocorr
-
-
-
-
-
-
-
-

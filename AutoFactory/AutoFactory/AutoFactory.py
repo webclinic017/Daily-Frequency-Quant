@@ -1,5 +1,20 @@
 # Copyright (c) 2021 Dai HBG
 
+import numpy as np
+import sys
+import os
+import pickle
+
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Tester/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/DataLoader/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/AutoFormula/')
+sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Model/')
+
+from DataLoader import DataLoader
+from BackTester import BackTester
+from AutoFormula import AutoFormula
+import Model
+
 """
 AutoFactory类是一个总体的集成类，通过调用其他类实现以下功能模块：
 1. 测试因子，该功能通过AutoFormula类定义的方法实现
@@ -20,30 +35,17 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 2021-09-06
 -- 更新：使用预测函数时所需的信号放在内存中，不需要重复读取，除非以后有更加复杂的模型
 """
-import numpy as np
-import sys
-import os
-import pickle
-
-sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Tester/')
-sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/DataLoader/')
-sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/AutoFormula/')
-sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactory/Model/')
-
-from DataLoader import DataLoader
-from BackTester import BackTester
-from AutoFormula import AutoFormula
-import Model
 
 
 class AutoFactory:
-    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None, return_type='open_close_4'):
+    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None, return_type='close_close_1'):
         """
         :param user_id: 登录聚宽的用户id
         :param password: 登录密码
         :param start_date: 总体的开始日期
         :param end_date: 总体的结束日期
         :param dump_signal_path: dump信号矩阵路径
+        :param return_type: 收益率预测形式，默认是收盘价到收盘价，意味着日度调仓
         """
         self.start_date = start_date
         self.end_date = end_date
@@ -103,10 +105,11 @@ class AutoFactory:
         with open(path, 'a+') as f:
             f.write(factor + '\n')
 
-    def long_stock_predict(self, model_name, date=None, n=1):  # 每日推荐股票多头
+    def long_stock_predict(self, model_name, factor, date=None, n=1):  # 每日推荐股票多头
         """
         :param n: 推荐得分最高的n只股票
         :param model_name: 使用的模型
+        :param factor: 使用的因子
         :param date: 预测哪一天
         :return: 直接打印结果
         """
@@ -118,7 +121,7 @@ class AutoFactory:
         print('getting signal...')
         num = 0
         signals_dic = {}
-        with open('F:/Documents/AutoFactoryData/Factors/factors_pv_2020-11-01_2021-07-30.txt') as file:
+        with open('F:/Documents/AutoFactoryData/Factors/{}.txt'.format(factor)) as file:
             while True:
                 fml = file.readline().strip()
                 if not fml:

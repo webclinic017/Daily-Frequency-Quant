@@ -1,10 +1,17 @@
 # Copyright (c) 2021 Dai HBG
 
+import numpy as np
+import datetime
+
 """
 BackTester类根据传入信号以及交易逻辑进行交易
 """
-import numpy as np
-import datetime
+
+"""
+开发日志
+2021-09-07
+-- 更新：BackTester类统计pnl序列的平均日收益，最大回撤，标准差，夏普比，最长亏损时间
+"""
 
 
 class BackTester:
@@ -20,7 +27,35 @@ class BackTester:
         self.market_pnl = []  # 如果纯多头，这里存市场的pnl，以比较超额收益
         self.market_cumulated_pnl = []
 
+        self.max_dd = 0  # 统计pnl序列的最大回撤
+        self.mean_pnl = 0  # 平均pnl
+        self.std = 0  # 统计pnl序列的标准差
+        self.sharp_ratio = 0  # 夏普比
+        self.max_loss_time = 0  # 最长亏损时间
+
         self.log = []  # 记录每一个具体的交易日给出的股票
+
+    def cal_stats(self):
+        self.std = np.std(self.pnl)
+        self.mean_pnl = np.mean(self.pnl)
+        self.sharp_ratio = self.mean_pnl / self.std
+
+        max_dd = 0
+        max_pnl = 0
+        max_loss_time = 0
+        loss_time = 0
+        for i in self.cumulated_pnl:
+            if i > max_pnl:
+                max_pnl = i
+                loss_time = 0
+            else:
+                if max_pnl - i > max_dd:
+                    max_dd = max_pnl - i
+                loss_time += 1
+                if loss_time > max_loss_time:
+                    max_loss_time = loss_time
+        self.max_dd = max_dd
+        self.max_loss_time = max_loss_time
 
     def long_short(self, start_date=None, end_date=None, n=0):  # 多空策略
         """

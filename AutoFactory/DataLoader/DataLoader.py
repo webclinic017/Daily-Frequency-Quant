@@ -19,6 +19,10 @@ v1.0
 
 2021-09-05
 -- 更新：Data类新增position_date_dic属性，用于检测每一个交易日给出的股票仓位
+
+2021-09-07
+-- 更新：在调用get_matrix_data方法时，检查文件夹下是否包含了所需的所有文件，只有都包含，且检查开始日期和结束日期包含在之中时才读出，否则
+        全部重新生成
 """
 
 import numpy as np
@@ -196,7 +200,7 @@ class DataLoader:
 
     def get_matrix_data(self, back_test_name='default', frequency='daily',
                         start_date='2021-01-01', end_date='2021-06-30', back_windows=10,
-                        return_type='open_close_4'):
+                        return_type='close_close_1'):
         """
         :param back_test_name: 该回测的名字
         :param frequency: 回测频率，目前默认且仅支持日频
@@ -217,8 +221,26 @@ class DataLoader:
             if back_test_name not in lst:
                 os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
             lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
-            if 'code_order_dic.pkl' not in lst:  # code_order_dic用于存储该回测区间内出现过的股票代码到矩阵位置的映射
+            names_to_check = ['code_order_dic.pkl', 'raw_data_dic,pkl', 'return.pkl',
+                              'order_code_dic.pkl', 'date_position_dic.pkl',
+                              'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl']
+            # 判断是否要重写
+            rewrite = False
+            for name in names_to_check:
+                if name not in lst:
+                    rewrite = True
+                    break
+            if not rewrite:
+                with open('{}/{}/start_end_date.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    start_end_date = pickle.load(f)
+                if start_date < start_end_date[0] or end_date > start_end_date[1]:
+                    rewrite = True
+
+            if rewrite:  # code_order_dic用于存储该回测区间内出现过的股票代码到矩阵位置的映射
                 print('getting data...')
+                start_end_date = (start_date, end_date)
+                with open('{}/{}/start_end_date.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(start_end_date, f)
                 dates = os.listdir('{}/StockDailyData'.format(self.data_path))
                 code_order_dic = {}  # 股票代码到位置的映射
                 order_code_dic = {}  # 位置到股票代码的映射
@@ -322,10 +344,10 @@ class DataLoader:
                 for i in range(len(top) - 1, 0, -1):  # 剔除上市不足50个交易日的股票
                     for j in range(top.shape[1]):
                         if i <= 50:
-                            if np.isnan(data_dic['close'][0, j]):
+                            if np.isnan(data_dic['close'][0, j]) or data_dic['close'][0, j] == 0:
                                 top[i, j] = False
                         else:
-                            if np.isnan(data_dic['close'][i - 50, j]):
+                            if np.isnan(data_dic['close'][i - 50, j]) or data_dic['close'][i - 50, j] == 0:
                                 top[i, j] = False
 
                 # 写入数据
@@ -340,6 +362,7 @@ class DataLoader:
                 return data
             else:
                 # 直接读入数据
+                print('using cache')
                 with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
                     data_dic = pickle.load(f)
                 with open('{}/{}/return.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
