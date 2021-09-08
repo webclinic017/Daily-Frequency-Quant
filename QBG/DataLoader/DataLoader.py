@@ -112,16 +112,17 @@ class DataLoader:
         if data_type is None:  # 参数默认值不要是可变的，否则可能出错
             data_type = ['stock_daily']
 
+        start_date = start_date.split('-')
+        end_date = end_date.split('-')
+
+        begin = datetime.date(int(start_date[0]), int(start_date[1]), int(start_date[2]))
+        end = datetime.date(int(end_date[0]), int(end_date[1]), int(end_date[2]))
+
+        all_stocks = list(get_all_securities(types=['stock'], date=end_date).index)  # 只获取最后一天的
+
         if 'stock_daily' in data_type:  # 获取日频量价、资金流数据
-            all_stocks = list(get_all_securities(types=['stock'], date=end_date).index)  # 只获取最后一天的
 
             lst = os.listdir('{}/StockDailyData'.format(self.data_path))  # 所有的日期文件夹
-
-            start_date = start_date.split('-')
-            end_date = end_date.split('-')
-
-            begin = datetime.date(int(start_date[0]), int(start_date[1]), int(start_date[2]))
-            end = datetime.date(int(end_date[0]), int(end_date[1]), int(end_date[2]))
 
             for i in range((end - begin).days + 1):
                 date = begin + datetime.timedelta(days=i)
@@ -163,24 +164,25 @@ class DataLoader:
                 with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
                     pickle.dump(all_indexes, f)
 
-        """
         if 'minute' in data_type:
+
             lst = os.listdir('{}/StockIntraDayData'.format(self.data_path))
-            if date not in lst:
-                os.makedirs('{}/StockIntraDayData/{}'.format(self.data_path, date))
-                all_stocks = list(get_all_securities(types=['stock'], date=date).index)
+            for i in range((end - begin).days + 1):
+                date = begin + datetime.timedelta(days=i)
+                if date.weekday() in [5, 6]:  # 略过周末
+                    continue
+                if str(date) not in lst:
+                    os.makedirs('{}/StockIntraDayData/{}'.format(self.data_path, date))
                 for stock in all_stocks:  # 剔除创业板股票，避免超出查询限制
-                    if stock[:3] == '003':
+                    if stock[:3] == '300' or stock[:3] == '688':
                         continue
-                    day = date.split('-')
-                    end_date = str(datetime.date(int(day[0]), int(day[1]), int(day[2])).timedelta(days=1))
+                    end_date = date + datetime.timedelta(days=1)
                     intra_day_data = get_price(stock, frequency='minute',
-                                               field=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
-                                                      'factor'],
+                                               fields=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
+                                                       'factor'],
                                                start_date=date, end_date=end_date)
                     with open('{}/StockIntraDayData/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
                         pickle.dump(intra_day_data, f)
-        """
 
     """
     get_matrix_data方法读取给定起始日期的原始数据，并生成需要的收益率矩阵，字典等
@@ -198,7 +200,7 @@ class DataLoader:
     -- get_matrix_data方法需要剔除科创版和创业板股票，并且返回Data类中需要写入top矩阵
     """
 
-    def get_matrix_data(self, back_test_name='default', frequency='daily',
+    def get_matrix_data(self, back_test_name='default', frequency=None,
                         start_date='2021-01-01', end_date='2021-06-30', back_windows=10,
                         return_type='close_close_1'):
         """
@@ -216,7 +218,9 @@ class DataLoader:
         tmp = end_date.split('-')
         end_date = datetime.date(int(tmp[0]), int(tmp[1]), int(tmp[2]))  # 回测结束时间
 
-        if frequency == 'daily':  # 当前仅支持日频的回测
+        if frequency is None:
+            frequency = ['daily']
+        if 'daily' in frequency:  # 当前仅支持日频的回测
             lst = os.listdir('{}'.format(self.back_test_data_path))
             if back_test_name not in lst:
                 os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
