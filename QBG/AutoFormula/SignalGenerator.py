@@ -73,7 +73,7 @@ class SignalGenerator:
         def tsdelta(a, num):
             s = np.zeros(a.shape)
             s[num:] = a[num:] - a[:-num]
-            return a
+            return s
 
         self.operation_dic['tsdelta'] = tsdelta
 

@@ -4,9 +4,12 @@
 该代码定义的类用于计算一个信号的平均IC等统计值
 This code is used for calculating the average IC and other statistical values of a signal
 
-v1.0
+开发日志
 2021-08-30
 -- 定义：计算平均IC，信号自相关系数，IC_IR，IC为正的频率
+
+2021-09-08
+-- 新增：统计信号排名最高的1个，5个，10个股票的平均收益，以评估信号的纯多头表现
 """
 
 import numpy as np
@@ -19,6 +22,7 @@ class Stats:
         self.auto_corr = 0
         self.IC_IR = 0
         self.positive_IC_rate = 0
+        self.top_n_ret = {1: [], 5: [], 10: []}  # 存储多头平均收益
 
 
 class AutoTester:
@@ -38,10 +42,17 @@ class AutoTester:
             top = signal != 0
         ics = []
         auto_corr = []
+        top_1 = []
+        top_5 = []
+        top_10 = []
         assert len(signal) == len(ret)
         assert len(signal) == len(top)
         for i in range(len(signal)):
             ics.append(np.corrcoef(signal[i, top[i]], ret[i, top[i]])[0, 1])
+            arg = signal[i, top[i]].argsort()
+            top_1.append(np.mean(ret[i, top[i]][arg[-1:]]))
+            top_5.append(np.mean(ret[i, top[i]][arg[-5:]]))
+            top_10.append(np.mean(ret[i, top[i]][arg[-10:]]))
             if i >= 1:
                 auto_corr.append(
                     np.corrcoef(signal[i, top[i] & top[i - 1]], ret[i, top[i] & top[i - 1]])[0, 1])
@@ -55,17 +66,20 @@ class AutoTester:
         stats.ICs = ics
         stats.mean_IC = np.mean(ics)
         stats.auto_corr = np.mean(auto_corr)
+        stats.top_n_ret[1] = top_1
+        stats.top_n_ret[5] = top_5
+        stats.top_n_ret[10] = top_10
+
         if len(ics) > 1:
             stats.IC_IR = np.mean(ics) / np.std(ics)
         stats.positive_IC_rate = np.sum(ics > 0) / len(ics)
         return stats
 
     @staticmethod
-    def cal_bin_ret(signal, ret, top=None):
+    def cal_bin_ret(signal, ret, top=None, cell=20):
         signal[np.isnan(signal)] = 0
         if top is None:
             top = signal != 0
-        cell = 20
         z = [[] for i in range(cell)]
         r = [[] for i in range(cell)]
 
