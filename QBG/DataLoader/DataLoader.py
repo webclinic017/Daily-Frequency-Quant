@@ -27,6 +27,7 @@ v1.0
 2021-09-12
 -- 更新：Data类生成时加入一个raw_ret属性，用于记录原始的日收益率，判断是否是涨停板不可买入
 -- 更新：top的计算加入流动性选择、股票池选择，例如中证500
+-- 更新：get_pv_data新增获取每日的行业和概念数据的字段，可以获取每天的所有概念和所有行业分类的股票，目前对于行业只使用二级行业分类，以节省查询行数
 """
 
 import numpy as np
@@ -114,7 +115,7 @@ class DataLoader:
         :return: 无返回值
         """
         if data_type is None:  # 参数默认值不要是可变的，否则可能出错
-            data_type = ['stock_daily']
+            data_type = ['stock_daily', 'industry']  # 默认获取股票日数据，行业和概念分类
 
         start_date = start_date.split('-')
         end_date = end_date.split('-')
@@ -167,9 +168,34 @@ class DataLoader:
                 all_indexes = get_all_securities(types=['index'], date=date)
                 with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
                     pickle.dump(all_indexes, f)
+                print('{} done.'.format(date))
+
+        if 'industry' in data_type:  # 获取行业分类，最后以字典形式存储
+            print('getting industry data...')
+            concepts = list(get_concepts().index)  # 获得所有的概念名称
+            begin = datetime.date(int(start_date[0]), int(start_date[1]), int(start_date[2]))
+            end = datetime.date(int(end_date[0]), int(end_date[1]), int(end_date[2]))
+            for i in range((end - begin).days + 1):
+                date = begin + datetime.timedelta(days=i)
+                if date.weekday() in [5, 6]:  # 略过周末
+                    continue
+                industry_dic = {'concept': {}, 'swf': {}, 'sws': {}, 'swt': {}}
+                ind = list(get_industries('sw_l1').index)  # 申万一级行业
+                for name in ind:
+                    industry_dic['swf'][name] = get_industry_stocks(name, date=date)
+                ind = list(get_industries('sw_l2').index)  # 申万二级行业
+                for name in ind:
+                    industry_dic['sws'][name] = get_industry_stocks(name, date=date)
+                ind = list(get_industries('sw_l3').index)  # 申万三级行业
+                for name in ind:
+                    industry_dic['swt'][name] = get_industry_stocks(name, date=date)
+                for name in concepts:
+                    industry_dic['concept'][name] = get_concept_stocks(name, date=date)
+                with open('{}/StockDailyData/{}/industry_{}.dic.pkl'.format(self.data_path, date, date), 'wb') as f:
+                    pickle.dump(industry_dic, f)
+                print('{} done.'.format(date))
 
         if 'minute' in data_type:
-
             lst = os.listdir('{}/StockIntraDayData'.format(self.data_path))
             for i in range((end - begin).days + 1):
                 date = begin + datetime.timedelta(days=i)
@@ -214,6 +240,7 @@ class DataLoader:
         :param end_date: 结束时间
         :param back_windows: 开始时间向前多长的滑动窗口
         :param return_type: 该字段描述需要预测的收益率类型
+        :param top_constraint: 决定如何筛选股票，默认选出成交量最大的50只股票
         :return:
         """
         # 读入dataframe数据另存为便于处理的矩阵形式
@@ -361,8 +388,8 @@ class DataLoader:
 
                 if top_constraint == 'volume':  # 按照成交量筛选前500的股票
                     for i in range(len(top)):
-                        tmp = data_dic['volume'][top[i]].argsort()[-500:]  # 成交量最大的500只
-                        tmp_value = np.zeros(len(top[i][top[i]]))
+                        tmp = data_dic['volume'][i][top[i]].argsort()[-1000:]  # 成交量最大的1000只
+                        tmp_value = np.zeros(np.sum(top[i]))
                         tmp_value[tmp] = True
                         top[i][top[i]] = tmp_value
 
