@@ -225,13 +225,14 @@ class DataLoader:
             if back_test_name not in lst:
                 os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
             lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
-            names_to_check = ['code_order_dic.pkl', 'raw_data_dic,pkl', 'return.pkl',
+            names_to_check = ['code_order_dic.pkl', 'raw_data_dic.pkl', 'return.pkl',
                               'order_code_dic.pkl', 'date_position_dic.pkl',
                               'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl']
             # 判断是否要重写
             rewrite = False
             for name in names_to_check:
                 if name not in lst:
+                    print('{} not found'.format(name))
                     rewrite = True
                     break
             if not rewrite:

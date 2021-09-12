@@ -13,7 +13,8 @@ sys.path.append('C:/Users/Administrator/Desktop/Daily-Frequency-Quant/AutoFactor
 from DataLoader import DataLoader
 from BackTester import BackTester
 from AutoFormula import AutoFormula
-import Model
+from Model import Model
+from DataSetConstructor import DataSetConstructor
 
 """
 AutoFactory类是一个总体的集成类，通过调用其他类实现以下功能模块：
@@ -34,6 +35,8 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 开发日志
 2021-09-06
 -- 更新：使用预测函数时所需的信号放在内存中，不需要重复读取，除非以后有更加复杂的模型
+2021-09-11
+-- 更新：新增滚动回测方法，测试模型的长期稳健性。默认可以回溯100天滚动5天预测
 """
 
 
@@ -52,8 +55,6 @@ class AutoFactory:
         self.dataloader = DataLoader(user_id, password)
         self.data = self.dataloader.get_matrix_data(start_date=start_date,
                                                     end_date=end_date, return_type=return_type)
-        self.back_tester = BackTester(data=self.data)  # 模拟交易回测
-        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, top=self.data.top)
 
         if dump_signal_path is None:
             lst = os.listdir('F:/Documents/AutoFactoryData/Signal')
@@ -61,7 +62,9 @@ class AutoFactory:
                 os.makedirs('F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date))
             dump_signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date)
         self.dump_signal_path = dump_signal_path
-
+        self.back_tester = BackTester(data=self.data)  # 模拟交易回测
+        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, top=self.data.top)
+        self.dsc = DataSetConstructor(self.data)
         self.dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
 
     def test_factor(self, formula, start_date=None, end_date=None, prediction_mode=False):  # 测试因子
@@ -86,11 +89,47 @@ class AutoFactory:
             return self.autoformula.test_formula(formula, self.data, start_date, end_date,
                                                  prediction_mode=prediction_mode)  # 只返回signal
 
-    def backtest(self, signal, start_date=None, end_date=None):
+    def rolling_backtest(self, model_name='lgbm', start_date=None, end_date=None, n=3, time_window=5,
+                         back_window=100, strategy='long_short'):  # 滚动回测
         if start_date is None:
-            start_date = self.start_date
+            start_date = str(self.start_date)
         if end_date is None:
-            end_date = self.end_date
+            end_date = str(self.end_date)
+        start, end = self.data.get_real_date(start_date, end_date)
+        assert start >= back_window  # 防止无法回溯
+        model = Model()
+        pnl = []
+        cumulated_pnl = []
+        i = start
+        self.dsc = DataSetConstructor(self.data)
+        while i + time_window < end:
+            s = i - back_window - 1
+            e = i - 1
+            s_date = str(self.data.position_date_dic[s])
+            e_date = str(self.data.position_date_dic[e])
+            s_forward = str(self.data.position_date_dic[i])
+            e_forward = str(self.data.position_date_dic[i + time_window])
+            print('testing {} to {}'.format(s_forward, e_forward))
+            x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
+            model.fit(x[:-6000, :], y[:-6000], x[-6000:, :], y[-6000:], model=model_name)
+            signal = self.back_tester.generate_signal(model.model, self.dsc.signals_dic,
+                                                      start_date=s_forward, end_date=e_forward)
+            if strategy == 'long_short':
+                l = self.back_tester.long_short(start_date=s_forward, end_date=e_forward)
+            if strategy == 'long_top_n':
+                l = self.back_tester.long_top_n(start_date=s_forward, end_date=e_forward, n=n)
+            if strategy == 'long':
+                l = self.back_tester.long(start_date=s_forward, end_date=e_forward, n=0)
+            pnl += self.back_tester.pnl
+            c_pnl = self.back_tester.cumulated_pnl.copy()
+            if not cumulated_pnl:
+                cumulated_pnl = c_pnl.copy()
+            else:
+                for j in range(len(c_pnl)):
+                    c_pnl[j] += cumulated_pnl[-1]
+                cumulated_pnl += c_pnl
+            i += time_window
+        return pnl, cumulated_pnl
 
     def dump_signal(self, signal):
         num = len(os.listdir(self.dump_signal_path))  # 先统计有多少信号

@@ -6,6 +6,8 @@ Model是若干个定义了多种标准化以及结构化的模型框架，可以
 开发日志：
 2021-09-10
 -- 新增：使用网格搜索方法对因子搜索系数，以优化指定区间内得分最高的n个股票的平均收益
+2021-09-11
+-- 新增：lightgbm方法，以及Lasso和lightgbm做boosting
 """
 import sys
 from sklearn import linear_model
@@ -65,6 +67,15 @@ class MyLinearModel:
         self.coef_ = opt_coef
 
 
+class MyBoostingModel:  # 为了统一接口，需要定义fit方法
+    def __init__(self, lasso, lgbm):
+        self.lasso = lasso
+        self.lgbm = lgbm
+
+    def predict(self, x):
+        return self.lasso.predict(x) + self.lgbm.predict(x)
+
+
 class Model:
     def __init__(self):
         self.model = None
@@ -79,7 +90,7 @@ class Model:
         :param param: 该模型对应的参数
         :return:
         """
-        if model is None or model == 'Lasso':  # 默认使用LASSO
+        if model is None or model == 'Lasso':  # 默认使用Lasso
             self.model = linear_model.Lasso(alpha=5e-4)
             print('there are {} factors'.format(x_train.shape[1]))
             self.model.fit(x_train, y_train)
@@ -98,7 +109,18 @@ class Model:
             val_data = lgb.Dataset(x_test, label=y_test)
             self.model = lgb.train(params, trn_data, num_round, valid_sets=[trn_data, val_data], verbose_eval=20)
         if model == 'Lasso_lgbm_boosting':
-            pass
+            model_1 = linear_model.Lasso(alpha=5e-4)
+            model_1.fit(x_train, y_train)
+            params = {'num_leaves': 20, 'min_data_in_leaf': 50, 'objective': 'regression', 'max_depth': 6,
+                      'learning_rate': 0.05, "min_sum_hessian_in_leaf": 6,
+                      "boosting": "gbdt", "feature_fraction": 0.9, "bagging_freq": 1, "bagging_fraction": 0.7,
+                      "bagging_seed": 11, "lambda_l1": 2, "verbosity": 1, "nthread": -1,
+                      'metric': 'mae', "random_state": 2019}  # 'device': 'gpu'}
+            num_round = 100
+            trn_data = lgb.Dataset(x_train, label=y_train - model_1.predict(x_train))
+            val_data = lgb.Dataset(x_test, label=y_test - model_1.predict(x_test))
+            model_2 = lgb.train(params, trn_data, num_round, valid_sets=[trn_data, val_data], verbose_eval=20)
+            self.model = MyBoostingModel(model_1, model_2)
         if model == 'Lasso':
             pass
 

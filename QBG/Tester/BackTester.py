@@ -11,6 +11,8 @@ BackTester类根据传入信号以及交易逻辑进行交易
 开发日志
 2021-09-07
 -- 更新：BackTester类统计pnl序列的平均日收益，最大回撤，标准差，夏普比，最长亏损时间
+2021-09-11
+-- 修复：回测时剔除涨停板
 """
 
 
@@ -93,6 +95,45 @@ class BackTester:
                         self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
                                                                                               self.data.top[i]]) / 2)
 
+    def long(self, start_date=None, end_date=None, n=0):  # 多头策略
+        """
+        :param start_date: 开始日期
+        :param end_date: 结束日期
+        :param n: 进入股票数量，0表示使用top
+        :return:
+        """
+        self.pnl = []
+        self.cumulated_pnl = []
+        self.market_pnl = []
+        self.market_cumulated_pnl = []
+
+        if start_date is None:
+            start_date = str(self.data.start_date)
+        if end_date is None:
+            end_date = str(self.data.end_date)
+
+        start, end = self.data.get_real_date(start_date, end_date)
+
+        if n != 0:  # 暂时不管
+            return
+        else:
+            for i in range(start, end + 1):
+                tmp = self.signal[i].copy()
+                tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
+                tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
+                tmp[self.data.top[i] & (tmp < 0)] = 0
+                self.pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1, self.data.top[i]]) -
+                                np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                if not self.cumulated_pnl:
+                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
+                                                                                           self.data.top[i]]) -
+                                              np.mean(self.data.ret[i + 1, self.data.top[i]]))
+                else:
+                    self.cumulated_pnl.append(
+                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
+                                                                                              self.data.top[i]]) -
+                        np.mean(self.data.ret[i + 1, self.data.top[i]]))
+
     def long_top_n(self, start_date=None, end_date=None, n=0):  # 做多预测得分最高的n只股票
         """
         :param start_date: 开始日期
@@ -130,7 +171,11 @@ class BackTester:
                                        self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
                                 np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                 """
-                self.pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                ret_tmp = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                # ret_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] >= 0.099] = 0  # 剔除涨停板
+                # if np.sum(ret_tmp == 0) >= 1:
+                # ret_tmp = np.zeros(ret_tmp.shape)
+                self.pnl.append(np.mean(ret_tmp))
                 self.market_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 if not self.cumulated_pnl:
                     """
@@ -147,7 +192,7 @@ class BackTester:
                                               np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                                               """
                     self.cumulated_pnl.append(self.cumulated_pnl[-1] +
-                                              np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                                              np.mean(ret_tmp))
                     self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
         else:

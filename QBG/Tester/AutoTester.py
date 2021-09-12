@@ -95,15 +95,16 @@ class AutoTester:
             signal_ret = []
             for j in range(len(tmp[top[i]])):
                 signal_ret.append((tmp[top[i]][j], tmp_ret[top[i]][j]))
-                signal_ret = sorted(signal_ret)
+            signal_ret = sorted(signal_ret)
             pos = 0
+
             while pos < cell:
                 if pos < cell - 1:
-                    for j in range(len(signal_ret) // cell * pos, len(signal_ret) // cell * (pos + 1)):
+                    for j in range(int(len(signal_ret) / cell * pos), int(len(signal_ret) / cell * (pos + 1))):
                         z[pos].append(signal_ret[j][0])
                         r[pos].append(signal_ret[j][1])
                 else:
-                    for j in range(len(signal_ret) // cell * pos, len(signal_ret)):
+                    for j in range(int(len(signal_ret) / cell * pos), len(signal_ret)):
                         z[pos].append(signal_ret[j][0])
                         r[pos].append(signal_ret[j][1])
                 pos += 1
