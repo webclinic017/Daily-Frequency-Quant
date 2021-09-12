@@ -23,6 +23,10 @@ v1.0
 2021-09-07
 -- 更新：在调用get_matrix_data方法时，检查文件夹下是否包含了所需的所有文件，只有都包含，且检查开始日期和结束日期包含在之中时才读出，否则
         全部重新生成
+
+2021-09-12
+-- 更新：Data类生成时加入一个raw_ret属性，用于记录原始的日收益率，判断是否是涨停板不可买入
+-- 更新：top的计算加入流动性选择、股票池选择，例如中证500
 """
 
 import numpy as np
@@ -202,7 +206,7 @@ class DataLoader:
 
     def get_matrix_data(self, back_test_name='default', frequency=None,
                         start_date='2021-01-01', end_date='2021-06-30', back_windows=10,
-                        return_type='close_close_1'):
+                        return_type='close_close_1', top_constraint='volume'):
         """
         :param back_test_name: 该回测的名字
         :param frequency: 回测频率，目前默认且仅支持日频
@@ -289,7 +293,7 @@ class DataLoader:
                 """
                 获得数据字典
                 """
-                names = ['open', 'close', 'high', 'low', 'avg', 'factor', 'turnover_ratio',
+                names = ['open', 'close', 'high', 'low', 'avg', 'factor', 'volume', 'turnover_ratio',
                          'net_pct_main', 'net_pct_xl', 'net_pct_l', 'net_pct_m', 'net_pct_s']
                 data_dic = {}
                 for name in names:
@@ -314,7 +318,7 @@ class DataLoader:
                             for j in range(len(data)):
                                 if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
                                     continue
-                                for name in names[:6]:
+                                for name in names[:7]:
                                     data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
 
                         with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
@@ -324,7 +328,7 @@ class DataLoader:
                             for j in range(len(data)):
                                 if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
                                     continue
-                                for name in names[6:7]:
+                                for name in names[7:8]:
                                     try:
                                         data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
                                     except KeyError:
@@ -337,7 +341,7 @@ class DataLoader:
                             for j in range(len(data)):
                                 if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
                                     continue
-                                for name in names[7:]:
+                                for name in names[8:]:
                                     data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
                         print('{} done.'.format(date))
                         k += 1
@@ -354,6 +358,13 @@ class DataLoader:
                         else:
                             if np.isnan(data_dic['close'][i - 50, j]) or data_dic['close'][i - 50, j] == 0:
                                 top[i, j] = False
+
+                if top_constraint == 'volume':  # 按照成交量筛选前500的股票
+                    for i in range(len(top)):
+                        tmp = data_dic['volume'][top[i]].argsort()[-500:]  # 成交量最大的500只
+                        tmp_value = np.zeros(len(top[i][top[i]]))
+                        tmp_value[tmp] = True
+                        top[i][top[i]] = tmp_value
 
                 # 写入数据
                 with open('{}/{}/raw_data_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
