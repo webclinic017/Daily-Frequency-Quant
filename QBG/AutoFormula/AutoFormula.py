@@ -2,6 +2,10 @@
 
 """
 该代码定义一个调用FormulaTree类生成公式树的自动化公式生成器，然后返回一个公式
+
+开发日志：
+2021-09-13
+-- 更新：AutoFormula类初始化需要传入一个data类
 """
 import numpy as np
 import sys
@@ -15,12 +19,12 @@ from SignalGenerator import SignalGenerator
 
 
 class AutoFormula:
-    def __init__(self, start_date, end_date, top, height=3, symmetric=False):
+    def __init__(self, start_date, end_date, data, height=3, symmetric=False):
         """
         :param start_date: 该公式树
         :param end_date:
-        :param top: 截面股票池
-        :param height:
+        :param data: Data实例
+        :param height: 最大深度
         :param symmetric:
         """
         self.height = height
@@ -29,7 +33,7 @@ class AutoFormula:
         self.end_date = end_date
         self.tree_generator = FormulaTree()
         self.tree = self.tree_generator.init_tree(height=self.height, symmetric=self.symmetric)
-        self.operation = SignalGenerator(top=top)
+        self.operation = SignalGenerator(data=data)
         self.formula_parser = FormulaParser()
         self.AT = AutoTester()
 

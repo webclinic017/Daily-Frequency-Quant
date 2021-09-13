@@ -4,6 +4,11 @@
 该代码定义的SignalGenerator类将解析一个公式，然后递归地计算signal值
 v1.0
 默认所有操作将nan替换成0
+
+开发日志：
+2021-09-13
+-- 新增：csindneutral算子，获得行业中性的信号
+-- 更新：为了方便算子计算，SignalGenerator类需要传入一个data类进行初始化
 """
 
 import numba as nb
@@ -11,14 +16,15 @@ import numpy as np
 
 
 class SignalGenerator:
-    def __init__(self, top):
+    def __init__(self, data):
         """
-        :param top: 计算截面时需要使用
+        :param data: Data类的实例
         """
         self.operation_dic = {}
         self.get_operation()
-        self.top = top
+        self.data = data
 
+        # 单独注册需要用到额外信息的算子
         self.operation_dic['zscore'] = self.zscore
         self.operation_dic['csrank'] = self.csrank
 
@@ -30,28 +36,33 @@ class SignalGenerator:
         b = a.copy()  # 测试用，可以不用复制
         b[np.isnan(b)] = 0
         for i in range(len(a)):
-            n = np.sum(b[i][self.top[i]] != 0)
+            n = np.sum(b[i][self.data.top[i]] != 0)
             if n == 0:
                 continue
-            tmp = b[i][self.top[i]].copy()
+            tmp = b[i][self.data.top[i]].copy()
             pos = tmp.argsort()
             for j in range(len(tmp)):
                 tmp[pos[j]] = j
-            tmp /= (len(self.top[i]) - 1)
-            b[i][self.top[i]] = tmp
+            tmp /= (len(self.data.top[i]) - 1)
+            b[i][self.data.top[i]] = tmp
         return b
 
     def zscore(self, a):
         b = a.copy()
         b[np.isnan(b)] = 0
         for i in range(len(a)):
-            if np.sum(b[i][self.top[i]] != 0) <= 1:
+            if np.sum(b[i][self.data.top[i]] != 0) <= 1:
                 continue
-            b[i][self.top[i]] -= np.mean(b[i][self.top[i]])
-            b[i][self.top[i]] /= np.std(b[i][self.top[i]])
-            b[i][(self.top[i]) & (b[i] > 3)] = 3
-            b[i][(self.top[i]) & (b[i] < -3)] = -3
+            b[i][self.data.top[i]] -= np.mean(b[i][self.data.top[i]])
+            b[i][self.data.top[i]] /= np.std(b[i][self.data.top[i]])
+            b[i][(self.data.top[i]) & (b[i] > 3)] = 3
+            b[i][(self.data.top[i]) & (b[i] < -3)] = -3
         return b
+
+    def csindneutral(self, a):  # 截面中性化，暂时先使用申万二级行业，之后需要加入可选行业中性化
+        s = a.copy()
+        for i in range(len(s)):
+            pass
 
     def get_operation(self):
         def neg(a):

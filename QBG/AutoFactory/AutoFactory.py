@@ -41,19 +41,21 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 
 
 class AutoFactory:
-    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None, return_type='close_close_1'):
+    def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None,
+                 back_test_name='default', return_type='close_close_1'):
         """
         :param user_id: 登录聚宽的用户id
         :param password: 登录密码
         :param start_date: 总体的开始日期
         :param end_date: 总体的结束日期
         :param dump_signal_path: dump信号矩阵路径
+        :param back_test_name: 回测名称
         :param return_type: 收益率预测形式，默认是收盘价到收盘价，意味着日度调仓
         """
         self.start_date = start_date
         self.end_date = end_date
         self.dataloader = DataLoader(user_id, password)
-        self.data = self.dataloader.get_matrix_data(start_date=start_date,
+        self.data = self.dataloader.get_matrix_data(start_date=start_date, back_test_name=back_test_name,
                                                     end_date=end_date, return_type=return_type)
 
         if dump_signal_path is None:
@@ -63,7 +65,7 @@ class AutoFactory:
             dump_signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date)
         self.dump_signal_path = dump_signal_path
         self.back_tester = BackTester(data=self.data)  # 模拟交易回测
-        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, top=self.data.top)
+        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, data=self.data)
         self.dsc = DataSetConstructor(self.data)
         self.dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
 
