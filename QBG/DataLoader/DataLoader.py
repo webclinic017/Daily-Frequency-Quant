@@ -40,13 +40,14 @@ import datetime
 
 class Data:
     def __init__(self, code_order_dic, order_code_dic, date_position_dic, position_date_dic,
-                 data_dic, ret, start_date, end_date, top):
+                 data_dic, ret, industry, start_date, end_date, top):
         """
         :param code_order_dic: 股票代码到矩阵位置的字典
         :param order_code_dic: 矩阵位置到股票代码的字典
         :param date_position_dic: 日期到矩阵下标的字典
         :param data_dic: 所有的数据，形状一致
         :param ret: 使用的收益率
+        :param indutry: 使用的行业分类
         :param start_date: 回测开始日期
         :param end_date: 回测结束日期
         :param top: top矩阵中存储每一个交易日可选的股票
@@ -57,6 +58,7 @@ class Data:
         self.position_date_dic = position_date_dic
         self.data_dic = data_dic
         self.ret = ret
+        self.industry = industry
         self.start_date = start_date
         self.end_date = end_date
         self.top = top
@@ -258,7 +260,8 @@ class DataLoader:
             lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
             names_to_check = ['code_order_dic.pkl', 'raw_data_dic.pkl', 'return.pkl',
                               'order_code_dic.pkl', 'date_position_dic.pkl',
-                              'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl']
+                              'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl', 'industry.pkl',
+                              'industry_order_dic.pkl', 'order_industry_dic.pkl']
             # 判断是否要重写
             rewrite = False
             for name in names_to_check:
@@ -317,14 +320,44 @@ class DataLoader:
                 with open('{}/{}/position_date_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(position_date_dic, f)
 
-                """
-                获得数据字典
-                """
+                # 获得行业字典，形状和数据字典一致，需要构造一个行业到数字的映射
+                industry_order_dic = {'swf': {}, 'sws': {}, 'swt': {}, 'concept': {}}  # 行业编号到对应序号的字典，每个独立
+                order_industry_dic = {'swf': {}, 'sws': {}, 'swt': {}, 'concept': {}}  # 对应序号到行业编号的字典，每个独立
+                num_dic = {'swf': 0, 'sws': 0, 'swt': 0, 'concept': 0}  # 记录已经出现过的行业编号的总数
+                for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1 + 2):
+                    date = start_date + datetime.timedelta(days=i)  # 这里有bug要修复，万一延后的两天是周末，就有问题。加两天保险
+                    if date.weekday() in [5, 6]:  # 周末略过
+                        continue
+                    if str(date) in dates:
+                        with open('{}/StockDailyData/{}/industry_{}.pkl'.format(self.data_path,
+                                                                                date, date), 'rb') as file:
+                            industry = pickle.load(file)
+                            for key, value in industry.items():  # value也是一个字典
+                                ind_names = list(value.keys)
+                                for name in ind_names:
+                                    try:
+                                        industry_order_dic[key][name]
+                                    except KeyError:
+                                        industry_order_dic[key][name] = num_dic[key]
+                                        order_industry_dic[key][num] = name
+                                        num_dic[key] += 1
+                with open('{}/{}/industry_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(industry_order_dic, f)
+                with open('{}/{}/order_industry_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(order_industry_dic, f)
+
+                # 获得数据字典
                 names = ['open', 'close', 'high', 'low', 'avg', 'factor', 'volume', 'turnover_ratio',
                          'net_pct_main', 'net_pct_xl', 'net_pct_l', 'net_pct_m', 'net_pct_s']
-                data_dic = {}
+
+                data_dic = {}  # 原始数据字典
                 for name in names:
                     data_dic[name] = np.zeros((days, len(code_order_dic)))
+
+                industry = {}  # 行业分类字典
+                ind_names = ['swf', 'sws', 'swt', 'concept']
+                for name in ind_names:
+                    industry[name] = np.zeros((days, len(code_order_dic)))
 
                 ret = np.zeros((days, len(code_order_dic)))
                 start_name = return_type.split('_')[0]
@@ -336,6 +369,7 @@ class DataLoader:
                     if date.weekday() in [5, 6]:
                         continue
                     if str(date) in dates:
+                        # 处理基本数据
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
@@ -348,6 +382,7 @@ class DataLoader:
                                 for name in names[:7]:
                                     data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
 
+                        # 处理基本面
                         with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
                                                                                    date, date), 'rb') as file:
                             data = pickle.load(file)
@@ -361,6 +396,7 @@ class DataLoader:
                                     except KeyError:
                                         pass
 
+                        # 处理资金流
                         with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path,
                                                                                   date, date), 'rb') as file:
                             data = pickle.load(file)
@@ -370,6 +406,21 @@ class DataLoader:
                                     continue
                                 for name in names[8:]:
                                     data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
+
+                        # 处理行业
+                        with open('{}/StockDailyData/{}/industry_{}.pkl'.format(self.data_path,
+                                                                                date, date), 'rb') as file:
+                            data = pickle.load(file)
+                            for ind_name in ind_names:
+                                ind = data[ind_name]  # 该天的一个行业分类
+                                for key, value in ind.items():  # value是一个列表，里面是股票代码
+                                    ind_num = industry_order_dic[ind_name][key]  # 这个列表里面的股票代码
+                                    for code in value:
+                                        try:
+                                            industry[ind_name][k, order_code_dic[code]] = ind_num
+                                        except KeyError:
+                                            pass
+
                         print('{} done.'.format(date))
                         k += 1
                 ret[:-length] = data_dic[end_name][length:] / data_dic[start_name][:-length] - 1
@@ -400,8 +451,10 @@ class DataLoader:
                     pickle.dump(ret, f)
                 with open('{}/{}/top.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                     pickle.dump(top, f)
+                with open('{}/{}/industry.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    pickle.dump(industry, f)
                 data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
-                            data_dic, ret, start_date, end_date, top)
+                            data_dic, ret, industry, start_date, end_date, top)
                 return data
             else:
                 # 直接读入数据
@@ -420,6 +473,8 @@ class DataLoader:
                     position_date_dic = pickle.load(f)
                 with open('{}/{}/top.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
                     top = pickle.load(f)
+                with open('{}/{}/industry.pkl'.format(self.back_test_data_path, back_test_name), 'rb') as f:
+                    industry = pickle.load(f)
                 data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
-                            data_dic, ret, start_date, end_date, top)
+                            data_dic, ret, industry, start_date, end_date, top)
                 return data
