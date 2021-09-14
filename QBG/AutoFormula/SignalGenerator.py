@@ -13,7 +13,6 @@ v1.0
 
 import numba as nb
 import numpy as np
-from collections import defaultdict
 
 
 class SignalGenerator:
@@ -62,34 +61,32 @@ class SignalGenerator:
 
     def csindneutral(self, a):  # 截面中性化，暂时先使用申万二级行业，之后需要加入可选行业中性化
         s = a.copy()
-        dic = self.data.code_industry_dic['sws']  # 申万二级行业股票位置到行业编号的字典
+        ind = self.data.industry['sws']  # 申万二级行业的位置
         for i in range(len(s)):
-            ind_num_dic = defaultdict(int)  # 存放行业总数
-            ind_sum_dic = defaultdict(int)  # 存放行业总值
-            for j in range(s.shape[1]):
-                ind_num_dic[dic[a[i, j]]] += 1
-                ind_sum_dic[dic[a[i, j]]] += a[i, j]
+            ind_num_dic = {}  # 存放行业总数
+            ind_sum_dic = {}  # 存放行业总值
+            for j in list(set(ind[i])):
+                ind_num_dic[j] = np.sum(ind[i] == j)
+                ind_sum_dic[j] = np.sum(a[i, ind[i] == j])
             for key in ind_sum_dic.keys():
-                if ind_sum_dic[key] != 0:
-                    ind_sum_dic[key] /= ind_sum_dic[key]
+                ind_sum_dic[key] /= ind_sum_dic[key]
             for j in range(s.shape[1]):
-                s[i, j] = a[i, j] - ind_sum_dic[ic[a[i, j]]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
+                s[i, j] = a[i, j] - ind_sum_dic[ind[i, j]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
         return s
 
     def csind(self, a):  # 截面替换成所处行业的均值
         s = a.copy()
-        dic = self.data.code_industry_dic['sws']  # 申万二级行业股票位置到行业编号的字典
+        ind = self.data.industry['sws']  # 申万二级行业的位置
         for i in range(len(s)):
-            ind_num_dic = defaultdict(int)  # 存放行业总数
-            ind_sum_dic = defaultdict(int)  # 存放行业总值
-            for j in range(s.shape[1]):
-                ind_num_dic[dic[a[i, j]]] += 1
-                ind_sum_dic[dic[a[i, j]]] += a[i, j]
+            ind_num_dic = {}  # 存放行业总数
+            ind_sum_dic = {}  # 存放行业总值
+            for j in list(set(ind[i])):
+                ind_num_dic[j] = np.sum(ind[i] == j)
+                ind_sum_dic[j] = np.sum(a[i, ind[i] == j])
             for key in ind_sum_dic.keys():
-                if ind_sum_dic[key] != 0:
-                    ind_sum_dic[key] /= ind_sum_dic[key]
+                ind_sum_dic[key] /= ind_sum_dic[key]
             for j in range(s.shape[1]):
-                s[i, j] = ind_sum_dic[ic[a[i, j]]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
+                s[i, j] = ind_sum_dic[ind[i, j]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
         return s
 
     def get_operation(self):
