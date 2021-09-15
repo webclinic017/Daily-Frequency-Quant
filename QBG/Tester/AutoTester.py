@@ -55,7 +55,7 @@ class AutoTester:
             top_10.append(np.mean(ret[i, top[i]][arg[-10:]]))
             if i >= 1:
                 auto_corr.append(
-                    np.corrcoef(signal[i, top[i] & top[i - 1]], ret[i, top[i] & top[i - 1]])[0, 1])
+                    np.corrcoef(signal[i, top[i] & top[i - 1]], signal[i - 1, top[i] & top[i - 1]])[0, 1])
 
         ics = np.array(ics)
         ics[np.isnan(ics)] = 0

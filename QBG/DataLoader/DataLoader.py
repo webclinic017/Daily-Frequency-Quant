@@ -334,14 +334,14 @@ class DataLoader:
                         if str(date) in dates:
                             with open('{}/StockDailyData/{}/industry_{}.pkl'.format(self.data_path,
                                                                                     date, date), 'rb') as file:
-                                industry = pickle.load(file)
-                                for key, value in industry.items():  # value也是一个字典
-                                    ind_names = list(value.keys())
+                                industry_dic = pickle.load(file)
+                                for key, value in industry_dic.items():  # value也是一个字典，key是行业编号，value是股票列表
+                                    ind_names = list(value.keys())  # 行业编号
                                     for name in ind_names:
                                         try:
                                             industry_order_dic[key][name]
                                         except KeyError:
-                                            industry_order_dic[key][name] = num_dic[key]
+                                            industry_order_dic[key][name] = num_dic[key]  # 该行业分类准则下一个行业编号的序号
                                             order_industry_dic[key][num_dic[key]] = name
                                             num_dic[key] += 1
                     with open('{}/{}/industry_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
@@ -358,9 +358,9 @@ class DataLoader:
                     data_dic[name] = np.zeros((days, len(code_order_dic)))
 
                 industry = {}  # 行业分类字典
-                ind_names = ['swf', 'sws', 'swt', 'concept']
+                ind_names = ['swf', 'sws', 'swt', 'concept']  # 行业分类准则
                 for name in ind_names:
-                    industry[name] = np.zeros((days, len(code_order_dic)))
+                    industry[name] = -np.ones((days, len(code_order_dic)))  # 初始化为-1，如果有股票不被分类
 
                 ret = np.zeros((days, len(code_order_dic)))
                 start_name = return_type.split('_')[0]
@@ -416,12 +416,13 @@ class DataLoader:
                                                                                     date, date), 'rb') as file:
                                 data = pickle.load(file)
                                 for ind_name in ind_names:
-                                    ind = data[ind_name]  # 该天的一个行业分类
+                                    ind = data[ind_name]  # 该天的一个行业分类，形式是行业编号：代码列表
                                     for key, value in ind.items():  # value是一个列表，里面是股票代码
-                                        ind_num = industry_order_dic[ind_name][key]  # 这个列表里面的股票代码
-                                        for code in value:
+                                        ind_num = industry_order_dic[ind_name][key]
+
+                                        for code in value:  # 这个列表里面的股票代码
                                             try:
-                                                industry[ind_name][k, order_code_dic[code]] = ind_num
+                                                industry[ind_name][k, code_order_dic[code]] = ind_num
                                             except KeyError:
                                                 pass
 

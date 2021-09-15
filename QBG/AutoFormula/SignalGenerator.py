@@ -27,6 +27,8 @@ class SignalGenerator:
         # 单独注册需要用到额外信息的算子
         self.operation_dic['zscore'] = self.zscore
         self.operation_dic['csrank'] = self.csrank
+        self.operation_dic['csindneutral'] = self.csindneutral
+        self.operation_dic['csind'] = self.csind
 
         """
         截面算子，因为要调用top
@@ -69,7 +71,7 @@ class SignalGenerator:
                 ind_num_dic[j] = np.sum(ind[i] == j)
                 ind_sum_dic[j] = np.sum(a[i, ind[i] == j])
             for key in ind_sum_dic.keys():
-                ind_sum_dic[key] /= ind_sum_dic[key]
+                ind_sum_dic[key] /= ind_num_dic[key]
             for j in range(s.shape[1]):
                 s[i, j] = a[i, j] - ind_sum_dic[ind[i, j]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
         return s
@@ -84,7 +86,7 @@ class SignalGenerator:
                 ind_num_dic[j] = np.sum(ind[i] == j)
                 ind_sum_dic[j] = np.sum(a[i, ind[i] == j])
             for key in ind_sum_dic.keys():
-                ind_sum_dic[key] /= ind_sum_dic[key]
+                ind_sum_dic[key] /= ind_num_dic[key]
             for j in range(s.shape[1]):
                 s[i, j] = ind_sum_dic[ind[i, j]]  # 减去行业平均，如果是没有出现过的行业，那么就是0
         return s

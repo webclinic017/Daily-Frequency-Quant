@@ -41,7 +41,7 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 class AutoFactory:
     def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None,
                  back_test_name='default', return_type='close_close_1', need_industry=False,
-                 data_path=None, back_test_data_path=None):  # 暂时需要说明说否需要行业
+                 data_path=None, back_test_data_path=None, dump_factor_path=None):  # 暂时需要说明说否需要行业
         """
         :param user_id: 登录聚宽的用户id
         :param password: 登录密码
@@ -71,10 +71,13 @@ class AutoFactory:
                 os.makedirs('F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date))
             dump_signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date)
         self.dump_signal_path = dump_signal_path
+        if dump_signal_path is None:
+            dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
+        self.dump_factor_path = dump_factor_path
         self.back_tester = BackTester(data=self.data)  # 模拟交易回测
         self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, data=self.data)
-        self.dsc = DataSetConstructor(self.data)
-        self.dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
+        self.dsc = DataSetConstructor(self.data, signal_path=self.dump_signal_path)
+
 
     def test_factor(self, formula, start_date=None, end_date=None, prediction_mode=False):  # 测试因子
         """
@@ -99,7 +102,19 @@ class AutoFactory:
                                                  prediction_mode=prediction_mode)  # 只返回signal
 
     def rolling_backtest(self, model_name='lgbm', start_date=None, end_date=None, n=3, time_window=5,
-                         back_window=100, strategy='long_short'):  # 滚动回测
+                         back_window=100, strategy='long_short', frequency='weekly', start_weekday=1):  # 滚动回测
+        """
+        :param model_name: 如果使用模型进行回测，说明模型名字
+        :param start_date: 回测开始日期
+        :param end_date: 回测结束日期
+        :param n: 如果strategy是long_to_n，指定long多少只股票
+        :param time_window: 同一个策略滚动使用多少次调仓，注意是调仓，如果是周频，time_window取1指的是每周调仓时都重新训练
+        :param back_window: 训练模型时回溯多少个交易日，注意这里是交易日
+        :param strategy: 根据信号构造仓位的方式
+        :param frequency: 交易频率，daily是日频，weekly是周频
+        :param start_weekday: 如果是周频，start_weekday字段指的是在周几买入
+        :return:
+        """
         if start_date is None:
             start_date = str(self.start_date)
         if end_date is None:
@@ -107,20 +122,36 @@ class AutoFactory:
         start, end = self.data.get_real_date(start_date, end_date)
         assert start >= back_window  # 防止无法回溯
         model = Model()
+
+        if start_weekday == 1:
+            start_weekday = 5
+        else:
+            start_weekday -= 1  # 因为周一买入的股票用的是周五的信号
+
         pnl = []
         cumulated_pnl = []
         i = start
         self.dsc = DataSetConstructor(self.data)
+
+        stride = 0  # 表示是否需要训练模型
         while i + time_window < end:
+            if frequency == 'weekly':
+                if self.data.position_date_dic[i].weekday() != start_weekday - 1:
+                    continue  # 如果不是买入的日子，就略过
             s = i - back_window - 1
             e = i - 1
             s_date = str(self.data.position_date_dic[s])
             e_date = str(self.data.position_date_dic[e])
             s_forward = str(self.data.position_date_dic[i])
-            e_forward = str(self.data.position_date_dic[i + time_window])
+            e_forward = str(self.data.position_date_dic[i + 1])
             print('testing {} to {}'.format(s_forward, e_forward))
-            x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
-            model.fit(x[:-6000, :], y[:-6000], x[-6000:, :], y[-6000:], model=model_name)
+            if stride == 0:
+                x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
+                model.fit(x[:-6000, :], y[:-6000], x[-6000:, :], y[-6000:], model=model_name)
+            else:
+                stride += 1
+                if stride == time_window:
+                    stride = 0
             signal = self.back_tester.generate_signal(model.model, self.dsc.signals_dic,
                                                       start_date=s_forward, end_date=e_forward)
             if strategy == 'long_short':
