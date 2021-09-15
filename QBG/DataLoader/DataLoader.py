@@ -193,7 +193,7 @@ class DataLoader:
                     industry_dic['swt'][name] = get_industry_stocks(name, date=date)
                 for name in concepts:
                     industry_dic['concept'][name] = get_concept_stocks(name, date=date)
-                with open('{}/StockDailyData/{}/industry_{}.dic.pkl'.format(self.data_path, date, date), 'wb') as f:
+                with open('{}/StockDailyData/{}/industry_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
                     pickle.dump(industry_dic, f)
                 print('{} done.'.format(date))
 
@@ -300,7 +300,6 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
-                            #print(data)
                             if len(data) == 0:  # 说明当前无交易，略过
                                 continue
                             codes = list(data['code'])
@@ -337,13 +336,13 @@ class DataLoader:
                                                                                     date, date), 'rb') as file:
                                 industry = pickle.load(file)
                                 for key, value in industry.items():  # value也是一个字典
-                                    ind_names = list(value.keys)
+                                    ind_names = list(value.keys())
                                     for name in ind_names:
                                         try:
                                             industry_order_dic[key][name]
                                         except KeyError:
                                             industry_order_dic[key][name] = num_dic[key]
-                                            order_industry_dic[key][num] = name
+                                            order_industry_dic[key][num_dic[key]] = name
                                             num_dic[key] += 1
                     with open('{}/{}/industry_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
                         pickle.dump(industry_order_dic, f)
