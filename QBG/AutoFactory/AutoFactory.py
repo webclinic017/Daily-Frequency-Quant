@@ -40,7 +40,8 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 
 class AutoFactory:
     def __init__(self, user_id, password, start_date, end_date, dump_signal_path=None,
-                 back_test_name='default', return_type='close_close_1'):
+                 back_test_name='default', return_type='close_close_1', need_industry=False,
+                 data_path=None, back_test_data_path=None):  # 暂时需要说明说否需要行业
         """
         :param user_id: 登录聚宽的用户id
         :param password: 登录密码
@@ -51,10 +52,18 @@ class AutoFactory:
         :param return_type: 收益率预测形式，默认是收盘价到收盘价，意味着日度调仓
         """
         self.start_date = start_date
+        if data_path is None:
+            data_path = 'F:/Documents/AutoFactoryData'
+        self.data_path = data_path
+        if back_test_data_path is None:
+            back_test_data_path = 'F:/Documents/AutoFactoryData/BackTestData'
+        self.back_test_data_path = back_test_data_path
         self.end_date = end_date
-        self.dataloader = DataLoader(user_id, password)
+        self.dataloader = DataLoader(user_id, password, data_path=self.data_path,
+                                     back_test_data_path=self.back_test_data_path)
         self.data = self.dataloader.get_matrix_data(start_date=start_date, back_test_name=back_test_name,
-                                                    end_date=end_date, return_type=return_type)
+                                                    end_date=end_date, return_type=return_type,
+                                                    need_industry=need_industry)
 
         if dump_signal_path is None:
             lst = os.listdir('F:/Documents/AutoFactoryData/Signal')

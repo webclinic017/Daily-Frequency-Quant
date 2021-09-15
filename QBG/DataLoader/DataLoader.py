@@ -300,6 +300,7 @@ class DataLoader:
                         with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
                                                                              date, date), 'rb') as file:
                             data = pickle.load(file)
+                            #print(data)
                             if len(data) == 0:  # 说明当前无交易，略过
                                 continue
                             codes = list(data['code'])
