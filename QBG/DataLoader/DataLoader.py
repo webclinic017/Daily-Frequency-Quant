@@ -433,7 +433,7 @@ class DataLoader:
                 ret[np.isnan(ret)] = 0
 
                 # 生成top
-                top = (data_dic['close'] < 50) & (data_dic['close'] > 10)
+                top = (data_dic['close'] < 100) & (data_dic['close'] > 10)
                 for i in range(len(top) - 1, 0, -1):  # 剔除上市不足50个交易日的股票
                     for j in range(top.shape[1]):
                         if i <= 50:
