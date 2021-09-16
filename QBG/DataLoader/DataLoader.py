@@ -262,8 +262,9 @@ class DataLoader:
             lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
             names_to_check = ['code_order_dic.pkl', 'raw_data_dic.pkl', 'return.pkl',
                               'order_code_dic.pkl', 'date_position_dic.pkl',
-                              'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl', 'industry.pkl',
-                              'industry_order_dic.pkl', 'order_industry_dic.pkl']
+                              'position_date_dic.pkl', 'top.pkl', 'start_end_date.pkl']
+            if need_industry:
+                names_to_check += ['industry.pkl', 'industry_order_dic.pkl', 'order_industry_dic.pkl']
             # 判断是否要重写
             rewrite = False
             for name in names_to_check:

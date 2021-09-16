@@ -71,13 +71,12 @@ class AutoFactory:
                 os.makedirs('F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date))
             dump_signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(start_date, end_date)
         self.dump_signal_path = dump_signal_path
-        if dump_signal_path is None:
+        if dump_factor_path is None:
             dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
         self.dump_factor_path = dump_factor_path
         self.back_tester = BackTester(data=self.data)  # 模拟交易回测
         self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, data=self.data)
         self.dsc = DataSetConstructor(self.data, signal_path=self.dump_signal_path)
-
 
     def test_factor(self, formula, start_date=None, end_date=None, prediction_mode=False):  # 测试因子
         """
@@ -124,7 +123,7 @@ class AutoFactory:
         model = Model()
 
         if start_weekday == 1:
-            start_weekday = 5
+            start_weekday = 4
         else:
             start_weekday -= 1  # 因为周一买入的股票用的是周五的信号
 
@@ -135,23 +134,23 @@ class AutoFactory:
 
         stride = 0  # 表示是否需要训练模型
         while i + time_window < end:
-            if frequency == 'weekly':
-                if self.data.position_date_dic[i].weekday() != start_weekday - 1:
-                    continue  # 如果不是买入的日子，就略过
+            if frequency == 'weekly' and self.data.position_date_dic[i].weekday() != start_weekday:
+                i += 1
+                continue  # 如果不是买入的日子，就略过
             s = i - back_window - 1
             e = i - 1
             s_date = str(self.data.position_date_dic[s])
             e_date = str(self.data.position_date_dic[e])
             s_forward = str(self.data.position_date_dic[i])
-            e_forward = str(self.data.position_date_dic[i + 1])
+            e_forward = str(self.data.position_date_dic[i])
             print('testing {} to {}'.format(s_forward, e_forward))
             if stride == 0:
                 x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
                 model.fit(x[:-6000, :], y[:-6000], x[-6000:, :], y[-6000:], model=model_name)
-            else:
-                stride += 1
-                if stride == time_window:
-                    stride = 0
+            stride += 1
+            if stride == time_window:
+                stride = 0
+
             signal = self.back_tester.generate_signal(model.model, self.dsc.signals_dic,
                                                       start_date=s_forward, end_date=e_forward)
             if strategy == 'long_short':
@@ -160,7 +159,7 @@ class AutoFactory:
                 l = self.back_tester.long_top_n(start_date=s_forward, end_date=e_forward, n=n)
             if strategy == 'long':
                 l = self.back_tester.long(start_date=s_forward, end_date=e_forward, n=0)
-            pnl += self.back_tester.pnl
+            pnl += self.back_tester.pnl  # pnl序列
             c_pnl = self.back_tester.cumulated_pnl.copy()
             if not cumulated_pnl:
                 cumulated_pnl = c_pnl.copy()
@@ -168,7 +167,7 @@ class AutoFactory:
                 for j in range(len(c_pnl)):
                     c_pnl[j] += cumulated_pnl[-1]
                 cumulated_pnl += c_pnl
-            i += time_window
+            i += 1
         return pnl, cumulated_pnl
 
     def dump_signal(self, signal):

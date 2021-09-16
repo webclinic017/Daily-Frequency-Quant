@@ -13,6 +13,7 @@ BackTester类根据传入信号以及交易逻辑进行交易
 -- 更新：BackTester类统计pnl序列的平均日收益，最大回撤，标准差，夏普比，最长亏损时间
 2021-09-11
 -- 修复：回测时剔除涨停板
+2021-09-
 """
 
 
@@ -120,18 +121,18 @@ class BackTester:
             for i in range(start, end + 1):
                 tmp = self.signal[i].copy()
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
-                tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
                 tmp[self.data.top[i] & (tmp < 0)] = 0
-                self.pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1, self.data.top[i]]) -
+                tmp_ret = self.data.ret[i + 1, self.data.top[i]].copy()
+                # tmp[self.data.top[i] & (self.data.ret[i] >= 0.099)] = 0  # 剔除涨停板
+                tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
+                self.pnl.append(np.sum(tmp[self.data.top[i]] * tmp_ret) -
                                 np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 if not self.cumulated_pnl:
-                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
-                                                                                           self.data.top[i]]) -
+                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * tmp_ret) -
                                               np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 else:
                     self.cumulated_pnl.append(
-                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
-                                                                                              self.data.top[i]]) -
+                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * tmp_ret) -
                         np.mean(self.data.ret[i + 1, self.data.top[i]]))
 
     def long_top_n(self, start_date=None, end_date=None, n=0):  # 做多预测得分最高的n只股票
@@ -163,6 +164,7 @@ class BackTester:
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
                 tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
                 tmp[self.data.top[i] & (tmp < 0)] = 0
+
                 a = tmp[self.data.top[i] & (tmp > 0)].argsort()[-n:]
                 self.log.append((self.data.position_date_dic[i],
                                  self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][0]]))
@@ -172,18 +174,57 @@ class BackTester:
                                 np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                 """
                 ret_tmp = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                ret_now = self.data.ret[i, self.data.top[i] & (tmp > 0)][a].copy()
+                sig_tmp = tmp[self.data.top[i] & (tmp > 0)][a].copy()
+                sig_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099] = 0  # 如果需要剔除涨停
+                pre_close = self.data.data_dic['close'][i, self.data.top[i] & (tmp > 0)][a].copy()
+                close = self.data.data_dic['close'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                next_close = self.data.data_dic['close'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
+                high = self.data.data_dic['high'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                next_high = self.data.data_dic['high'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
+
+                low = self.data.data_dic['low'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                h_c = high / pre_close - 1
+                c_h_next = next_close / high - 1
+                h_h = next_high / high - 1
+                """
+                for kk in range(n):
+                    if ret_now[kk] >= 0.099:  # 如果涨停，区分一字板
+                        if low[kk] == close[kk]:  # 说明一字板
+                            sig_tmp[kk] = 0
+                    elif h_c[kk] >= 0.098:  # 否则如果途中碰到疑似涨停，就买入
+                        if ret_now[kk] < 0.099:  # 碰涨停板就买入，此时要改收益率为今最高到明收盘
+                            ret_tmp[kk] = h_h[kk] if h_h[kk] >= 0.02 else c_h_next[kk]
+                """
+                print(np.sum(sig_tmp == 0))
+                if np.sum(sig_tmp == 0) > 0:
+                    # sig_tmp -= sig_tmp  # 有涨停板的那一天直接不交易
+                    for kk in range(n):
+                        sig_tmp[kk] = 1 / n if ret_now[kk] >= 0.099 else 0
+                    pass
+                else:
+                    # sig_tmp /= np.sum(sig_tmp)
+                    sig_tmp -= sig_tmp  # 只买涨停板
+                print(sig_tmp)
+                # print(ret_tmp)
+                # print(self.data.ret[i, self.data.top[i] & (tmp > 0)][a])
+                # print(np.mean(ret_tmp))
                 # ret_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] >= 0.099] = 0  # 剔除涨停板
+                # print(np.mean(ret_tmp[ret_tmp != 0]))
                 # if np.sum(ret_tmp == 0) >= 1:
                 # ret_tmp = np.zeros(ret_tmp.shape)
-                self.pnl.append(np.mean(ret_tmp))
-                self.market_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
+
+                # self.pnl.append(np.mean(ret_tmp[ret_tmp != 0]))
+                self.pnl.append(np.sum(sig_tmp * ret_tmp) -
+                                np.mean(self.data.ret[i + 1, self.data.top[i]]))  # 这是按照比例投资，只看纯超额
                 if not self.cumulated_pnl:
                     """
                     self.cumulated_pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
                                                      self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
                                               np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                                               """
-                    self.cumulated_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]))
+                    # self.cumulated_pnl.append(np.mean(ret_tmp[ret_tmp != 0]))
+                    self.cumulated_pnl.append(self.pnl[-1])  # 按照比例投资
                     self.market_cumulated_pnl.append(np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 else:
                     """
@@ -191,8 +232,10 @@ class BackTester:
                                                      self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
                                               np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                                               """
-                    self.cumulated_pnl.append(self.cumulated_pnl[-1] +
-                                              np.mean(ret_tmp))
+                    # self.cumulated_pnl.append(self.cumulated_pnl[-1] +
+                                              # np.mean(ret_tmp[ret_tmp != 0]))
+                    self.cumulated_pnl.append(self.cumulated_pnl[-1] + self.pnl[-1])
+
                     self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
         else:
