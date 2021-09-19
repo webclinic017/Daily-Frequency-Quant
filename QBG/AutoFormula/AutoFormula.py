@@ -25,7 +25,7 @@ class AutoFormula:
         :param end_date:
         :param data: Data实例
         :param height: 最大深度
-        :param symmetric:
+        :param symmetric: 是否对称
         """
         self.height = height
         self.symmetric = symmetric

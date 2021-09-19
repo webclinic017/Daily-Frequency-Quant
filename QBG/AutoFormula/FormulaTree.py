@@ -34,7 +34,8 @@ class FormulaParser:
                               '1_num': ['wdirect', 'tsrank', 'tskurtosis', 'tsskew',
                                         'tsmean', 'tsstd', 'tsdelay', 'tsdelta'],
                               '2': ['add', 'prod', 'minus', 'div'],
-                              '2_num': ['tscorr']}
+                              '2_num': ['tscorr'],
+                              '1_num_num': ['tsautocorr']}
 
         dic = {}
         for key, value in self.operation_dic.items():
@@ -286,6 +287,7 @@ class FormulaTree:
 
     def change_structure(self):  # 改变树的结构，可以选择是否局部更改
         pass
+
 
 
 

@@ -186,14 +186,15 @@ class SignalGenerator:
 
         @nb.jit
         def tsrank(a, num):
+            s = np.zeros(a.shape)
             for i in range(len(a)):
                 if i < num - 1:
                     continue
                 for j in range(a.shape[1]):
-                    tmp = a[i - num + 1:i + 1, j].sort()
-                    a[i, j] = np.where(tmp == a[i, j])[0]
-                    a[i, j] /= (num - 1)
-            return a
+                    tmp = sorted(a[i - num + 1:i + 1, j])
+                    s[i, j] = tmp.index(a[i, j])
+                    s[i, j] /= (num - 1)
+            return s
 
         self.operation_dic['tsrank'] = tsrank
 
@@ -258,3 +259,39 @@ class SignalGenerator:
             return s
 
         self.operation_dic['tsautocorr'] = tsautocorr
+
+        @nb.jit
+        def condition(a, b, c):
+            """
+            :param a: 条件，一个布尔型矩阵
+            :param b: 真的取值
+            :param c: 假的取值
+            :return: 信号
+            """
+            s = np.zeros(a.a.shape)
+            for i in range(len(a)):
+                s[i, a[i]] = b[i, a[i]]
+                s[i, ~a[i]] = c[i, ~a[i]]
+            return s
+
+        self.operation_dic['condition'] = condition
+
+        def lt(a, b):
+            return a < b
+
+        self.operation_dic['lt'] = lt
+
+        def le(a, b):
+            return a <= b
+
+        self.operation_dic['le'] = le
+
+        def gt(a, b):
+            return a > b
+
+        self.operation_dic['gt'] = gt
+
+        def ge(a, b):
+            return a >= b
+
+        self.operation_dic['ge'] = ge
