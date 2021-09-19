@@ -38,15 +38,15 @@ class SignalGenerator:
         b = a.copy()  # 测试用，可以不用复制
         b[np.isnan(b)] = 0
         for i in range(len(a)):
-            n = np.sum(b[i][self.data.top[i]] != 0)
+            n = np.sum(b[i, self.data.top[i]] != 0)
             if n == 0:
                 continue
-            tmp = b[i][self.data.top[i]].copy()
+            tmp = b[i, self.data.top[i]].copy()
             pos = tmp.argsort()
             for j in range(len(tmp)):
                 tmp[pos[j]] = j
-            tmp /= (len(self.data.top[i]) - 1)
-            b[i][self.data.top[i]] = tmp
+            tmp /= (len(tmp) - 1)
+            b[i, self.data.top[i]] = tmp
         return b
 
     def zscore(self, a):

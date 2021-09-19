@@ -181,6 +181,7 @@ class BackTester:
                 close = self.data.data_dic['close'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
                 next_close = self.data.data_dic['close'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
                 high = self.data.data_dic['high'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                openn = self.data.data_dic['open'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
                 next_high = self.data.data_dic['high'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
 
                 low = self.data.data_dic['low'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
@@ -189,22 +190,34 @@ class BackTester:
                 h_h = next_high / high - 1
                 """
                 for kk in range(n):
-                    if ret_now[kk] >= 0.099:  # 如果涨停，区分一字板
-                        if low[kk] == close[kk]:  # 说明一字板
+                    if h_c[kk] >= 0.098:  # 否则如果途中碰到疑似涨停，就买入
+                        if low[kk] == close[kk]:  # 一字涨停igh
                             sig_tmp[kk] = 0
-                    elif h_c[kk] >= 0.098:  # 否则如果途中碰到疑似涨停，就买入
-                        if ret_now[kk] < 0.099:  # 碰涨停板就买入，此时要改收益率为今最高到明收盘
-                            ret_tmp[kk] = h_h[kk] if h_h[kk] >= 0.02 else c_h_next[kk]
+                        elif high[kk] == close[kk]:  # 说明尾板封住
+                            sig_tmp[kk] = 1 / n
+                        else:  # 炸板补仓
+                            sig_tmp[kk] = 2 / n
+                            ret_tmp[kk] = c_h_next[kk] * 0.5 + ret_tmp[kk] * 0.5
+                    else:
+                        sig_tmp[kk] = 0  # 直接不做涨停板
                 """
+                for kk in range(n):
+                    if (openn[kk] < close[kk]) and (ret_now[kk] >= 0.099):
+                        sig_tmp[kk] = 1 / 5
+                    else:
+                        sig_tmp[kk] = 0
+
                 print(np.sum(sig_tmp == 0))
                 if np.sum(sig_tmp == 0) > 0:
-                    # sig_tmp -= sig_tmp  # 有涨停板的那一天直接不交易
-                    for kk in range(n):
-                        sig_tmp[kk] = 1 / n if ret_now[kk] >= 0.099 else 0
                     pass
+                    # sig_tmp -= sig_tmp  # 有涨停板的那一天直接不交易
+                    # for kk in range(n):
+                        # sig_tmp[kk] = 1 / n if ret_now[kk] >= 0.099 else 0
+
                 else:
+                    pass
                     # sig_tmp /= np.sum(sig_tmp)
-                    sig_tmp -= sig_tmp  # 只买涨停板
+                    # sig_tmp -= sig_tmp  # 只买涨停板
                 print(sig_tmp)
                 # print(ret_tmp)
                 # print(self.data.ret[i, self.data.top[i] & (tmp > 0)][a])
