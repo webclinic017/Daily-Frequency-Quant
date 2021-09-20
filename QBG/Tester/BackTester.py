@@ -60,8 +60,9 @@ class BackTester:
         self.max_dd = max_dd
         self.max_loss_time = max_loss_time
 
-    def long_short(self, start_date=None, end_date=None, n=0):  # 多空策略
+    def long_short(self, start_date=None, end_date=None, singal=None, n=0):  # 多空策略
         """
+        :param singal: 可传入自定义信号
         :param start_date: 开始日期
         :param end_date: 结束日期
         :param n: 进入股票数量，0表示使用top
@@ -78,12 +79,14 @@ class BackTester:
             end_date = str(self.data.end_date)
 
         start, end = self.data.get_real_date(start_date, end_date)
+        if signal is None:
+            signal = self.signal
 
         if n != 0:  # 暂时不管
             return
         else:
             for i in range(start, end + 1):
-                tmp = self.signal[i].copy()
+                tmp = signal[i].copy()
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
                 tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
                 tmp[self.data.top[i] & (tmp < 0)] /= -np.sum(tmp[self.data.top[i] & (tmp < 0)])
@@ -95,6 +98,7 @@ class BackTester:
                     self.cumulated_pnl.append(
                         self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * self.data.ret[i + 1,
                                                                                               self.data.top[i]]) / 2)
+        self.cal_stats()
 
     def long(self, start_date=None, end_date=None, n=0):  # 多头策略
         """
@@ -134,12 +138,17 @@ class BackTester:
                     self.cumulated_pnl.append(
                         self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * tmp_ret) -
                         np.mean(self.data.ret[i + 1, self.data.top[i]]))
+        self.cal_stats()
 
-    def long_top_n(self, start_date=None, end_date=None, n=0):  # 做多预测得分最高的n只股票
+    def long_top_n(self, start_date=None, end_date=None, n=0, signal=None, zt_filter=True,
+                   position_mode='weighted'):  # 做多预测得分最高的n只股票
         """
+        :param position_mode: 仓位配置模式
         :param start_date: 开始日期
         :param end_date: 结束日期
         :param n: 做多多少只股票，默认按照top做多
+        :param signal: 可以传入一个自定义的signal，默认使用自身的signal
+        :param zt_filter: 是否过滤涨停
         :return:
         """
         self.pnl = []
@@ -156,11 +165,13 @@ class BackTester:
             end_date = str(self.data.end_date)
 
         start, end = self.data.get_real_date(start_date, end_date)
+        if signal is None:
+            signal = self.signal
 
         pos = np.array([i for i in range(len(self.data.top[0]))])  # 测试用
         if n != 0:
             for i in range(start, end + 1):
-                tmp = self.signal[i].copy()
+                tmp = signal[i].copy()
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
                 tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
                 tmp[self.data.top[i] & (tmp < 0)] = 0
@@ -168,71 +179,17 @@ class BackTester:
                 a = tmp[self.data.top[i] & (tmp > 0)].argsort()[-n:]
                 self.log.append((self.data.position_date_dic[i],
                                  self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][0]]))
-                """
-                self.pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
-                                       self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a]) /
-                                np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
-                """
                 ret_tmp = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                # ret_now = self.data.ret[i, self.data.top[i] & (tmp > 0)][a].copy()
                 sig_tmp = tmp[self.data.top[i] & (tmp > 0)][a].copy()
-                # sig_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099] = 0  # 如果需要剔除涨停
-                print(np.sum(self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099))
+                if zt_filter:
+                    sig_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099] = 0  # 如果需要剔除涨停
                 sig_tmp /= np.sum(sig_tmp)
-
-                # pre_close = self.data.data_dic['close'][i, self.data.top[i] & (tmp > 0)][a].copy()
-                # close = self.data.data_dic['close'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                # next_close = self.data.data_dic['close'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
-                # high = self.data.data_dic['high'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                # openn = self.data.data_dic['open'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                # next_high = self.data.data_dic['high'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
-
-                # low = self.data.data_dic['low'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                # h_c = high / pre_close - 1
-                # c_h_next = next_close / high - 1
-                # h_h = next_high / high - 1
-                """
-                for kk in range(n):
-                    if h_c[kk] >= 0.098:  # 否则如果途中碰到疑似涨停，就买入
-                        if low[kk] == close[kk]:  # 一字涨停igh
-                            sig_tmp[kk] = 0
-                        elif high[kk] == close[kk]:  # 说明尾板封住
-                            sig_tmp[kk] = 1 / n
-                        else:  # 炸板补仓
-                            sig_tmp[kk] = 2 / n
-                            ret_tmp[kk] = c_h_next[kk] * 0.5 + ret_tmp[kk] * 0.5
-                    else:
-                        sig_tmp[kk] = 0  # 直接不做涨停板
-                
-                for kk in range(n):
-                    if (openn[kk] < close[kk]) and (ret_now[kk] >= 0.099):
-                        sig_tmp[kk] = 1 / 5
-                    else:
-                        sig_tmp[kk] = 0
-                """
-                # print(np.sum(sig_tmp == 0))
-                if np.sum(sig_tmp == 0) > 0:
-                    pass
-                    # sig_tmp -= sig_tmp  # 有涨停板的那一天直接不交易
-                    # for kk in range(n):
-                        # sig_tmp[kk] = 1 / n if ret_now[kk] >= 0.099 else 0
-
+                if position_mode == 'mean':
+                    self.pnl.append(np.mean(ret_tmp) -
+                                    np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 else:
-                    pass
-                    # sig_tmp /= np.sum(sig_tmp)
-                    # sig_tmp -= sig_tmp  # 只买涨停板
-                # print(sig_tmp)
-                # print(ret_tmp)
-                # print(self.data.ret[i, self.data.top[i] & (tmp > 0)][a])
-                # print(np.mean(ret_tmp))
-                # ret_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] >= 0.099] = 0  # 剔除涨停板
-                # print(np.mean(ret_tmp[ret_tmp != 0]))
-                # if np.sum(ret_tmp == 0) >= 1:
-                # ret_tmp = np.zeros(ret_tmp.shape)
-
-                # self.pnl.append(np.mean(ret_tmp[ret_tmp != 0]))
-                self.pnl.append(np.sum(sig_tmp * ret_tmp) -
-                                np.mean(self.data.ret[i + 1, self.data.top[i]]))  # 这是按照比例投资，只看纯超额
+                    self.pnl.append(np.sum(sig_tmp * ret_tmp) -
+                                    np.mean(self.data.ret[i + 1, self.data.top[i]]))  # 这是按照比例投资，只看纯超额
                 if not self.cumulated_pnl:
                     """
                     self.cumulated_pnl.append(np.sum(tmp[self.data.top[i] & (tmp > 0)][a] *
@@ -272,6 +229,7 @@ class BackTester:
                                                                                               self.data.top[i]]))
                     self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
+        self.cal_stats()
         return self.log
 
     def long_stock_predict(self, date=None, n=1):  # 非回测模式，直接预测最新交易日的股票

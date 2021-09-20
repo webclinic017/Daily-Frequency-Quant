@@ -170,6 +170,15 @@ class AutoFactory:
             i += 1
         return pnl, cumulated_pnl
 
+    def test_signal(self, signal, n=0, strategy='long_short', zt_filter=True):
+        if strategy == 'long_short':
+            self.back_tester.long_short(signal)
+        if strategy == 'long_top_n':
+            self.back_tester.long_top_n(signal=signal, n=n, zt_filter=zt_filter)
+        print('mean pnl: {:.4f}, sharp_ratio: {:.4f}, max_dd: {:.4f}'.format(self.back_tester.mean_pnl * 100,
+                                                                             self.back_tester.sharp_ratio,
+                                                                             self.back_tester.max_dd * 100))
+
     def dump_signal(self, signal):
         num = len(os.listdir(self.dump_signal_path))  # 先统计有多少信号
         with open('{}/signal_{}.pkl'.format(self.dump_signal_path, num), 'wb') as f:
