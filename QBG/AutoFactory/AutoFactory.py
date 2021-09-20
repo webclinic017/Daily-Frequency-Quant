@@ -170,11 +170,11 @@ class AutoFactory:
             i += 1
         return pnl, cumulated_pnl
 
-    def test_signal(self, signal, n=0, strategy='long_short', zt_filter=True):
+    def test_signal(self, signal, n=0, strategy='long_short', zt_filter=True, position_mode='mean'):
         if strategy == 'long_short':
             self.back_tester.long_short(signal)
         if strategy == 'long_top_n':
-            self.back_tester.long_top_n(signal=signal, n=n, zt_filter=zt_filter)
+            self.back_tester.long_top_n(signal=signal, n=n, zt_filter=zt_filter, position_mode=position_mode)
         print('mean pnl: {:.4f}, sharp_ratio: {:.4f}, max_dd: {:.4f}'.format(self.back_tester.mean_pnl * 100,
                                                                              self.back_tester.sharp_ratio,
                                                                              self.back_tester.max_dd * 100))
