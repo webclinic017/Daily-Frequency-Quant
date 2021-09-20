@@ -6,6 +6,8 @@
 开发日志：
 2021-09-13
 -- 更新：AutoFormula类初始化需要传入一个data类
+2021-09-20
+-- 更新：新增多个算子
 """
 import numpy as np
 import sys
@@ -62,6 +64,10 @@ class AutoFormula:
                     return self.operation.operation_dic[tree.name](self.cal_formula(tree.left, data_dic, return_type),
                                                                    self.cal_formula(tree.right, data_dic, return_type),
                                                                    self.cal_formula(tree.num, data_dic, return_type))
+                if tree.operation_type == '3':
+                    return self.operation.operation_dic[tree.name](self.cal_formula(tree.left, data_dic, return_type),
+                                                                   self.cal_formula(tree.middle, data_dic, return_type),
+                                                                   self.cal_formula(tree.right, data_dic, return_type))
         if return_type == 'str':
             if tree.variable_type == 'data':
                 return tree.name  # 返回字符串
@@ -78,6 +84,10 @@ class AutoFormula:
                     return tree.name + '{' + self.cal_formula(tree.left, data_dic, return_type) + ',' + \
                            self.cal_formula(tree.right, data_dic, return_type) + ',' + \
                            self.cal_formula(tree.num, data_dic, return_type) + '}'
+                if tree.operation_type == '3':
+                    return tree.name + '{' + self.cal_formula(tree.left, data_dic, return_type) + ',' + \
+                           self.cal_formula(tree.middle, data_dic, return_type) + ',' + \
+                           self.cal_formula(tree.right, data_dic, return_type) + '}'
 
     def test_formula(self, formula, data, start_date=None, end_date=None, prediction_mode=False):
         """

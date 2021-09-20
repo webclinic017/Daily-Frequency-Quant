@@ -187,13 +187,21 @@ class SignalGenerator:
         @nb.jit
         def tsrank(a, num):
             s = np.zeros(a.shape)
+
             for i in range(len(a)):
                 if i < num - 1:
                     continue
                 for j in range(a.shape[1]):
-                    tmp = sorted(a[i - num + 1:i + 1, j])
-                    s[i, j] = tmp.index(a[i, j])
-                    s[i, j] /= (num - 1)
+                    k = 0
+                    tar = a[i, j]
+                    if np.isnan(tar):
+                        tar = 0
+                    for c in a[i - num + 1:i + 1, j]:
+                        if np.isnan(c):
+                            continue
+                        if c < tar:
+                            k += 1
+                    s[i, j] = k / (num - 1)
             return s
 
         self.operation_dic['tsrank'] = tsrank
@@ -260,7 +268,7 @@ class SignalGenerator:
 
         self.operation_dic['tsautocorr'] = tsautocorr
 
-        @nb.jit
+        # @nb.jit
         def condition(a, b, c):
             """
             :param a: 条件，一个布尔型矩阵
@@ -268,10 +276,16 @@ class SignalGenerator:
             :param c: 假的取值
             :return: 信号
             """
-            s = np.zeros(a.a.shape)
+            s = np.zeros(a.shape)
             for i in range(len(a)):
-                s[i, a[i]] = b[i, a[i]]
-                s[i, ~a[i]] = c[i, ~a[i]]
+                if type(b) == int or type(b) == float:
+                    s[i, a[i]] = b
+                else:
+                    s[i, a[i]] = b[i, a[i]]
+                if type(c) == int or type(c) == float:
+                    s[i, ~a[i]] = c
+                else:
+                    s[i, ~a[i]] = c[i, ~a[i]]
             return s
 
         self.operation_dic['condition'] = condition

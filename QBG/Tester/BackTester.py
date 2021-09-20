@@ -174,20 +174,23 @@ class BackTester:
                                 np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                 """
                 ret_tmp = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                ret_now = self.data.ret[i, self.data.top[i] & (tmp > 0)][a].copy()
+                # ret_now = self.data.ret[i, self.data.top[i] & (tmp > 0)][a].copy()
                 sig_tmp = tmp[self.data.top[i] & (tmp > 0)][a].copy()
-                sig_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099] = 0  # 如果需要剔除涨停
-                pre_close = self.data.data_dic['close'][i, self.data.top[i] & (tmp > 0)][a].copy()
-                close = self.data.data_dic['close'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                next_close = self.data.data_dic['close'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
-                high = self.data.data_dic['high'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                openn = self.data.data_dic['open'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                next_high = self.data.data_dic['high'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
+                # sig_tmp[self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099] = 0  # 如果需要剔除涨停
+                print(np.sum(self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099))
+                sig_tmp /= np.sum(sig_tmp)
 
-                low = self.data.data_dic['low'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
-                h_c = high / pre_close - 1
-                c_h_next = next_close / high - 1
-                h_h = next_high / high - 1
+                # pre_close = self.data.data_dic['close'][i, self.data.top[i] & (tmp > 0)][a].copy()
+                # close = self.data.data_dic['close'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                # next_close = self.data.data_dic['close'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
+                # high = self.data.data_dic['high'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                # openn = self.data.data_dic['open'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                # next_high = self.data.data_dic['high'][i + 2, self.data.top[i] & (tmp > 0)][a].copy()
+
+                # low = self.data.data_dic['low'][i + 1, self.data.top[i] & (tmp > 0)][a].copy()
+                # h_c = high / pre_close - 1
+                # c_h_next = next_close / high - 1
+                # h_h = next_high / high - 1
                 """
                 for kk in range(n):
                     if h_c[kk] >= 0.098:  # 否则如果途中碰到疑似涨停，就买入
@@ -200,14 +203,14 @@ class BackTester:
                             ret_tmp[kk] = c_h_next[kk] * 0.5 + ret_tmp[kk] * 0.5
                     else:
                         sig_tmp[kk] = 0  # 直接不做涨停板
-                """
+                
                 for kk in range(n):
                     if (openn[kk] < close[kk]) and (ret_now[kk] >= 0.099):
                         sig_tmp[kk] = 1 / 5
                     else:
                         sig_tmp[kk] = 0
-
-                print(np.sum(sig_tmp == 0))
+                """
+                # print(np.sum(sig_tmp == 0))
                 if np.sum(sig_tmp == 0) > 0:
                     pass
                     # sig_tmp -= sig_tmp  # 有涨停板的那一天直接不交易
@@ -218,7 +221,7 @@ class BackTester:
                     pass
                     # sig_tmp /= np.sum(sig_tmp)
                     # sig_tmp -= sig_tmp  # 只买涨停板
-                print(sig_tmp)
+                # print(sig_tmp)
                 # print(ret_tmp)
                 # print(self.data.ret[i, self.data.top[i] & (tmp > 0)][a])
                 # print(np.mean(ret_tmp))

@@ -2,6 +2,10 @@
 
 """
 FormulaTree类定义了公式树变异的方法
+
+开发日志：
+2021-09-20
+-- 更新：新增多个算子
 """
 
 
@@ -10,12 +14,13 @@ import numpy as np
 
 class Node:
     def __init__(self, name, variable_type, operation_type=None,
-                 left=None, right=None, num=None):
+                 left=None, right=None, middle=None, num=None):
         """
         :param name: 操作或者数据的名字
         :param variable_type: 变量类型，data指的是数据，operation指的是算符
         :param operation_type: 算符类型，数字指的是多少目运算符，num指的是需要传入一个确定数字而不是运算结果
         :param left: 左子树，可以挂载一颗公式树或者数据节点
+        :param middle: 中间子树，可以挂载一颗公式树或者数据节点，也可以挂载数字
         :param right: 右子树，可以挂载一颗公式树或者数据节点
         :param num: 数字，如果算符需要传入一个数字
         """
@@ -33,9 +38,9 @@ class FormulaParser:
         self.operation_dic = {'1': ['csrank', 'zscore', 'neg', 'csindneutral', 'csind'],
                               '1_num': ['wdirect', 'tsrank', 'tskurtosis', 'tsskew',
                                         'tsmean', 'tsstd', 'tsdelay', 'tsdelta'],
-                              '2': ['add', 'prod', 'minus', 'div'],
+                              '2': ['add', 'prod', 'minus', 'div', 'lt', 'le', 'gt', 'ge'],
                               '2_num': ['tscorr'],
-                              '1_num_num': ['tsautocorr']}
+                              '3': ['condition', 'tsautocorr']}
 
         dic = {}
         for key, value in self.operation_dic.items():
@@ -148,6 +153,47 @@ class FormulaParser:
                 node.right = self.parse(s[d + 1:c])
                 node.left = self.parse(s[a + 1:d])
                 return node
+            if self.operation_type_dic[name] == '3':
+                # 定位第二个逗号
+                left_num = 0
+                right_num = 0
+                b = len(s) - 2  # 此时b在倒数第二个位置，是}或者一个字母
+                while True:
+                    if s[b] == '}':
+                        right_num += 1
+                    if s[b] == '{':
+                        left_num += 1
+                    if left_num == right_num:
+                        break
+                    b -= 1
+                if left_num == 0:
+                    b += 1
+                c = b - 1  # 此时c的位置是算子最后一位符号
+                while s[c] != ',':
+                    c -= 1
+                # 此时c的位置是第二个逗号的位置
+
+                b_1 = c - 1
+                left_num = 0
+                right_num = 0
+                while True:
+                    if s[b_1] == '}':
+                        right_num += 1
+                    if s[b_1] == '{':
+                        left_num += 1
+                    if left_num == right_num:
+                        break
+                    b_1 -= 1
+                if left_num == 0:
+                    b_1 += 1
+                c_1 = b_1 - 1
+                while s[c_1] != ',':
+                    c_1 -= 1  # 此时c_1的位置是第一个逗号
+
+                node.right = self.parse(s[c + 1:len(s) - 1])
+                node.left = self.parse(s[a + 1:c_1])
+                node.middle = self.parse(s[c_1 + 1:c])
+                return node
 
 
 class FormulaTree:
@@ -168,10 +214,10 @@ class FormulaTree:
                 tree.num = i
                 self.datas.append(tree)
 
-        self.operation_dic = {'1': ['csrank', 'zscore'],
+        self.operation_dic = {'1': ['csrank', 'zscore', 'neg', 'csindneutral', 'csind'],
                               '1_num': ['wdirect', 'tsrank', 'tskurtosis', 'tsskew',
                                         'tsmean', 'tsstd', 'tsdelay', 'tsdelta'],
-                              '2': ['add', 'prod', 'minus', 'div'],
+                              '2': ['add', 'prod', 'minus', 'div', 'lt', 'le', 'gt', 'ge'],
                               '2_num': ['tscorr']}
 
         dic = {}
@@ -180,8 +226,8 @@ class FormulaTree:
                 dic[v] = key
         self.operation_type_dic = dic
 
-        self.p = {'1': [1/2, 1/2], '1_num': [1/15, 4/15, 2/15, 2/15, 2/15, 2/15, 1/15, 1/15],
-                  '2': [1/7, 3/7, 1/7, 2/7], '2_num': [1]}  # 不同操作被选中的概率
+        self.p = {'1': [1/5, 1/5, 1/5, 1/5, 1/5], '1_num': [1/15, 4/15, 2/15, 2/15, 2/15, 2/15, 1/15, 1/15],
+                  '2': [1/11, 3/11, 1/11, 2/11, 1/11, 1/11, 1/11, 1/11], '2_num': [1]}  # 不同操作被选中的概率
 
     def init_tree(self, height, symmetric=False):
         """
