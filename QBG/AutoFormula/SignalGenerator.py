@@ -268,7 +268,6 @@ class SignalGenerator:
 
         self.operation_dic['tsautocorr'] = tsautocorr
 
-        # @nb.jit
         def condition(a, b, c):
             """
             :param a: 条件，一个布尔型矩阵
