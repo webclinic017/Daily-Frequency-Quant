@@ -35,6 +35,8 @@ AutoFactory类是一个总体的集成类，通过调用其他类实现以下功
 -- 更新：使用预测函数时所需的信号放在内存中，不需要重复读取，除非以后有更加复杂的模型
 2021-09-11
 -- 更新：新增滚动回测方法，测试模型的长期稳健性。默认可以回溯100天滚动5天预测
+2021-09-21
+-- 更新：每日预测的逻辑需要改变，具体为：首先需要新增dump_model方法保存模型，然后需要一个字段表明是否需要重训模型
 """
 
 
@@ -148,7 +150,7 @@ class AutoFactory:
             print('testing {} to {}'.format(s_forward, e_forward))
             if stride == 0:
                 x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
-                model.fit(x[:-6000, :], y[:-6000], x[-6000:, :], y[-6000:], model=model_name)
+                model.fit(x[:-1000, :], y[:-1000], x[-1000:, :], y[-1000:], model=model_name)
             stride += 1
             if stride == time_window:
                 stride = 0
@@ -195,20 +197,31 @@ class AutoFactory:
         with open(path, 'a+') as f:
             f.write(factor + '\n')
 
-    def long_stock_predict(self, model_name=None, factor=None, date=None, n=1):  # 每日推荐股票多头
+    def long_stock_predict(self, model_name=None, factor=None, date=None, n=1, retrain_model=False,
+                           back_window=100, model_type='Lasso', signal=None):  # 每日推荐股票多头
         """
+        :param model_type: 模型类型
         :param n: 推荐得分最高的n只股票
         :param model_name: 使用的模型，可以不使用模型
         :param factor: 使用的因子，可以是类型为字符串的绝对路径，也可以是列表
         :param date: 预测哪一天
+        :param retrain_model: 是否重训练模型
+        :param back_window:  重训模型时回溯的天数
+        :param signal:  可以直接传入一个信号矩阵进行预测
         :return: 直接打印结果
         """
         if date is None:
             date = str(self.data.end_date)  # 这里之后的版本要修改成更加灵活的读写信号，例如每天自动增量更新
+        if signal is not None:
+            ll = self.back_tester.long_stock_predict(date=date, n=n, signal=signal)
+            print(ll)
+            return
+        start, end = self.data.get_real_date(date, date)
         if model_name is not None:
-            print('reading model...')
-            with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'rb') as file:
-                model = pickle.load(file)
+            if not retrain_model:
+                print('reading model...')
+                with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'rb') as file:
+                    model = pickle.load(file)
         else:
             model = None
         print('getting signal...')
@@ -232,13 +245,27 @@ class AutoFactory:
                 signals_dic[num] = signal
                 num += 1
             print('there are {} factors'.format(num))
-        if model is None:
-            self.back_tester.generate_signal(model, signals_dic, end_date=date)
+        if retrain_model:
+            model = Model()
+            self.dsc = DataSetConstructor(self.data)
+            s = start - back_window - 1
+            e = start - 1
+            s_date = str(self.data.position_date_dic[s])
+            e_date = str(self.data.position_date_dic[e])
+            x, y = self.dsc.construct(start_date=s_date, end_date=e_date, signals_dic=signals_dic)
+            model.fit(x[:-1000, :], y[:-1000], x[-1000:, :], y[-1000:], model=model_type)
+            model.dump_model(model_name)
+        if model is not None:
+            if retrain_model:
+                signal = self.back_tester.generate_signal(model.model, signals_dic, end_date=date)
+            else:
+                signal = self.back_tester.generate_signal(model, signals_dic, end_date=date)
             ll = self.back_tester.long_stock_predict(date=date, n=n)
         else:
-            self.back_tester.generate_signal(model=None, signals_dic=signals_dic, end_date=date)
+            signal = self.back_tester.generate_signal(model=None, signals_dic=signals_dic, end_date=date)
             ll = self.back_tester.long_stock_predict(date=date, n=n)
         print(ll)
+        return signal
 
     def train(self):
         pass

@@ -43,8 +43,9 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         self.signals_dic = signals_dic
         print('done.')
 
-    def construct(self, start_date=None, end_date=None, zscore=True):
+    def construct(self, start_date=None, end_date=None, zscore=True, signals_dic=None):
         """
+        :param signals_dic: 信号字典
         :param start_date: 数据开始日期
         :param end_date: 数据结束日期
         :param zscore: 是否截面标准化，默认需要
@@ -54,6 +55,8 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
             start_date = str(self.data.start_date)
         if end_date is None:
             end_date = str(self.data.end_date)
+        if signals_dic is None:
+            signals_dic = self.signals_dic.copy
 
         start, end = self.data.get_real_date(start_date, end_date)
 
@@ -62,9 +65,9 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         for i in range(start, end + 1):
             x_tmp = []
             y_tmp = self.data.ret[i + self.shift, self.data.top[i]].copy()  # 做shift
-            for j in self.signals_dic.keys():
+            for j in signals_dic.keys():
 
-                tmp = self.signals_dic[j][i, self.data.top[i]].copy()
+                tmp = signals_dic[j][i, self.data.top[i]].copy()
                 tmp[np.isnan(tmp)] = 0  # 需要处理异常值
                 if zscore:
                     tmp -= np.mean(tmp)
