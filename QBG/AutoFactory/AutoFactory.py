@@ -101,8 +101,10 @@ class AutoFactory:
                                                  prediction_mode=prediction_mode)  # 只返回signal
 
     def rolling_backtest(self, model_name='lgbm', start_date=None, end_date=None, n=3, time_window=5,
-                         back_window=100, strategy='long_short', frequency='weekly', start_weekday=1):  # 滚动回测
+                         back_window=100, strategy='long_short', frequency='weekly', start_weekday=1,
+                         zt_filter=True):  # 滚动回测
         """
+        :param zt_filter: 是否过滤涨停
         :param model_name: 如果使用模型进行回测，说明模型名字
         :param start_date: 回测开始日期
         :param end_date: 回测结束日期
@@ -126,7 +128,7 @@ class AutoFactory:
             start_weekday = 4
         else:
             start_weekday -= 1  # 因为周一买入的股票用的是周五的信号
-
+        total_signal = np.zeros(self.data.top.shape)  # 存储所有的信号
         pnl = []
         cumulated_pnl = []
         i = start
@@ -153,10 +155,11 @@ class AutoFactory:
 
             signal = self.back_tester.generate_signal(model.model, self.dsc.signals_dic,
                                                       start_date=s_forward, end_date=e_forward)
+            total_signal += signal
             if strategy == 'long_short':
                 l = self.back_tester.long_short(start_date=s_forward, end_date=e_forward)
             if strategy == 'long_top_n':
-                l = self.back_tester.long_top_n(start_date=s_forward, end_date=e_forward, n=n)
+                l = self.back_tester.long_top_n(start_date=s_forward, end_date=e_forward, n=n, zt_filter=zt_filter)
             if strategy == 'long':
                 l = self.back_tester.long(start_date=s_forward, end_date=e_forward, n=0)
             pnl += self.back_tester.pnl  # pnl序列
@@ -168,7 +171,7 @@ class AutoFactory:
                     c_pnl[j] += cumulated_pnl[-1]
                 cumulated_pnl += c_pnl
             i += 1
-        return pnl, cumulated_pnl
+        return pnl, cumulated_pnl, total_signal
 
     def test_signal(self, signal, n=0, strategy='long_short', zt_filter=True, position_mode='mean'):
         if strategy == 'long_short':

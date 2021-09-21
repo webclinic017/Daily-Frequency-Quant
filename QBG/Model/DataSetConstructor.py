@@ -8,7 +8,8 @@ DataSetConstructor是一个根据起止日期生成按时间顺序排列的X和Y
 更新日志：
 2021-09-04
 -- 更新：信号不再直接传入，而是传入一个地址，然后初始化的时候读
-
+2021-09-21
+-- 更新：生成训练集时剔除涨停板，否则树方法会容易过拟合涨停
 """
 
 import numpy as np
@@ -60,6 +61,7 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         y = []
         for i in range(start, end + 1):
             x_tmp = []
+            y_tmp = self.data.ret[i + self.shift, self.data.top[i]].copy()  # 做shift
             for j in self.signals_dic.keys():
 
                 tmp = self.signals_dic[j][i, self.data.top[i]].copy()
@@ -70,9 +72,11 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
                         tmp /= np.std(tmp)
                     tmp[tmp > 3] = 3
                     tmp[tmp < -3] = -3
-                x_tmp.append(tmp)
+                x_tmp.append(tmp[y_tmp < 0.99])
+
+            y_tmp = y_tmp[y_tmp < 0.99]
             x.append(np.vstack(x_tmp).T)
-            y_tmp = self.data.ret[i+self.shift, self.data.top[i]].copy()  # 做shift
+
             if zscore:
                 y_tmp -= np.mean(y_tmp)
                 if np.sum(y_tmp != 0) >= 2:
