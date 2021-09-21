@@ -192,37 +192,49 @@ class AutoFactory:
         with open(path, 'a+') as f:
             f.write(factor + '\n')
 
-    def long_stock_predict(self, model_name, factor, date=None, n=1):  # 每日推荐股票多头
+    def long_stock_predict(self, model_name=None, factor=None, date=None, n=1):  # 每日推荐股票多头
         """
         :param n: 推荐得分最高的n只股票
-        :param model_name: 使用的模型
-        :param factor: 使用的因子
+        :param model_name: 使用的模型，可以不使用模型
+        :param factor: 使用的因子，可以是类型为字符串的绝对路径，也可以是列表
         :param date: 预测哪一天
         :return: 直接打印结果
         """
         if date is None:
             date = str(self.data.end_date)  # 这里之后的版本要修改成更加灵活的读写信号，例如每天自动增量更新
-        print('reading model...')
-        with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'rb') as file:
-            model = pickle.load(file)
+        if model_name is not None:
+            print('reading model...')
+            with open('F:/Documents/AutoFactoryData/Model/{}.pkl'.format(model_name), 'rb') as file:
+                model = pickle.load(file)
+        else:
+            model = None
         print('getting signal...')
-        num = 0
-        signals_dic = {}
-        with open('F:/Documents/AutoFactoryData/Factors/{}.txt'.format(factor)) as file:
-            while True:
-                fml = file.readline().strip()
-                if not fml:
-                    break
-                # print(fml)
+        if type(factor) == str:
+            num = 0
+            signals_dic = {}
+            with open('F:/Documents/AutoFactoryData/Factors/{}.txt'.format(factor)) as file:
+                while True:
+                    fml = file.readline().strip()
+                    if not fml:
+                        break
+                    signal = self.test_factor(fml, end_date=date, prediction_mode=True)
+                    signals_dic[num] = signal
+                    num += 1
+            print('there are {} factors'.format(num))
+        else:
+            num = 0
+            signals_dic = {}
+            for fml in factor:
                 signal = self.test_factor(fml, end_date=date, prediction_mode=True)
                 signals_dic[num] = signal
                 num += 1
-                # self.dump_factor(fml)
-                # self.dump_signal(signal)
-        # signal_path = 'F:/Documents/AutoFactoryData/Signal/{}-{}'.format(self.data.start_date, self.end_date)
-        print('there are {} factors'.format(num))
-        self.back_tester.generate_signal(model, signals_dic, end_date=date)
-        ll = self.back_tester.long_stock_predict(date=date, n=n)
+            print('there are {} factors'.format(num))
+        if model is None:
+            self.back_tester.generate_signal(model, signals_dic, end_date=date)
+            ll = self.back_tester.long_stock_predict(date=date, n=n)
+        else:
+            self.back_tester.generate_signal(model=None, signals_dic=signals_dic, end_date=date)
+            ll = self.back_tester.long_stock_predict(date=date, n=n)
         print(ll)
 
     def train(self):

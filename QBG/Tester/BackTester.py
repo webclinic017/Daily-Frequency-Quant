@@ -253,7 +253,7 @@ class BackTester:
                     [self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][j]] for j in range(n)],
                     tmp[self.data.top[i] & (tmp > 0)][a])
 
-    def generate_signal(self, model, signals_dic, start_date=None, end_date=None):
+    def generate_signal(self, model=None, signals_dic=None, start_date=None, end_date=None):
         """
         :param model: 一个模型
         :param signals_dic: 使用的原始信号字典
@@ -270,18 +270,20 @@ class BackTester:
 
         start, end = self.data.get_real_date(start_date, end_date)
 
-        for i in range(start, end + 1):
-            tmp_x = []
-            for j in signals_dic.keys():
-                tmp = signals_dic[j][i].copy()
-                tmp[np.isnan(tmp)] = 0
-                tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
-                if np.sum(tmp[self.data.top[i]] != 0) >= 2:
-                    tmp[self.data.top[i]] /= np.std(tmp[self.data.top[i]])
-                tmp_x.append(tmp)
-            tmp_x = np.vstack(tmp_x).T  # 用于预测
-            signal[i, self.data.top[i]] = model.predict(tmp_x[self.data.top[i], :])  # 只预测需要的部分
-
+        if model is not None:
+            for i in range(start, end + 1):
+                tmp_x = []
+                for j in signals_dic.keys():
+                    tmp = signals_dic[j][i].copy()
+                    tmp[np.isnan(tmp)] = 0
+                    tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
+                    if np.sum(tmp[self.data.top[i]] != 0) >= 2:
+                        tmp[self.data.top[i]] /= np.std(tmp[self.data.top[i]])
+                    tmp_x.append(tmp)
+                tmp_x = np.vstack(tmp_x).T  # 用于预测
+                signal[i, self.data.top[i]] = model.predict(tmp_x[self.data.top[i], :])  # 只预测需要的部分
+        else:
+            signal = signals_dic[0].copy()
         self.signal = signal
 
         return signal
