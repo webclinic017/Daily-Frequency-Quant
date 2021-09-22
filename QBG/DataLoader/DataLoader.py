@@ -28,6 +28,9 @@ v1.0
 -- 更新：Data类生成时加入一个raw_ret属性，用于记录原始的日收益率，判断是否是涨停板不可买入
 -- 更新：top的计算加入流动性选择、股票池选择，例如中证500
 -- 更新：get_pv_data新增获取每日的行业和概念数据的字段，可以获取每天的所有概念和所有行业分类的股票，目前对于行业只使用二级行业分类，以节省查询行数
+
+2021-09-22
+-- 更新：get_pv_data获取分钟数据时，采用增量更新，已有的数据不再重复查询，节约查询行数
 """
 
 import numpy as np
@@ -205,8 +208,11 @@ class DataLoader:
                     continue
                 if str(date) not in lst:
                     os.makedirs('{}/StockIntraDayData/{}'.format(self.data_path, date))
+                stocks = os.listdir('{}/StockIntraDayData/{}'.format(self.data_path, date))  # 上一次查询已有的股票
                 for stock in all_stocks:  # 剔除创业板股票，避免超出查询限制
                     if stock[:3] == '300' or stock[:3] == '688':
+                        continue
+                    if '{}.pkl'.format(stock) in stocks:
                         continue
                     end_date = date + datetime.timedelta(days=1)
                     intra_day_data = get_price(stock, frequency='minute',

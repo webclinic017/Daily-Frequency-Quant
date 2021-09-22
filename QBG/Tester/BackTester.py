@@ -1,20 +1,20 @@
 # Copyright (c) 2021 Dai HBG
 
-import numpy as np
-import datetime
-
 """
 BackTester类根据传入信号以及交易逻辑进行交易
-"""
 
-"""
 开发日志
 2021-09-07
 -- 更新：BackTester类统计pnl序列的平均日收益，最大回撤，标准差，夏普比，最长亏损时间
+
 2021-09-11
 -- 修复：回测时剔除涨停板
-2021-09-
+
+2021-09-21
+-- 修复：回测是要根据上一期的持仓确定涨停板是否剔除，有可能涨停的股票是有持仓的
 """
+import numpy as np
+import datetime
 
 
 class BackTester:
