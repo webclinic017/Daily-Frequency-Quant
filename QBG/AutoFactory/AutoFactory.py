@@ -54,6 +54,7 @@ class AutoFactory:
         :param return_type: 收益率预测形式，默认是收盘价到收盘价，意味着日度调仓
         """
         self.start_date = start_date
+        self.end_date = end_date
         if data_path is None:
             data_path = 'F:/Documents/AutoFactoryData'
         self.data_path = data_path
@@ -77,7 +78,12 @@ class AutoFactory:
             dump_factor_path = 'F:/Documents/AutoFactoryData/Factors'
         self.dump_factor_path = dump_factor_path
         self.back_tester = BackTester(data=self.data)  # 模拟交易回测
-        self.autoformula = AutoFormula(start_date=start_date, end_date=end_date, data=self.data)
+        self.autoformula = AutoFormula(start_date=start_date, end_date=self.end_date, data=self.data)
+        self.dsc = DataSetConstructor(self.data, signal_path=self.dump_signal_path)
+
+    def reset_data(self):  # 可以自行更改top，然后重置
+        self.back_tester = BackTester(data=self.data)  # 模拟交易回测
+        self.autoformula = AutoFormula(start_date=self.start_date, end_date=self.end_date, data=self.data)
         self.dsc = DataSetConstructor(self.data, signal_path=self.dump_signal_path)
 
     def test_factor(self, formula, start_date=None, end_date=None, prediction_mode=False):  # 测试因子
@@ -178,11 +184,17 @@ class AutoFactory:
     def test_signal(self, signal, n=0, strategy='long_short', zt_filter=True, position_mode='mean'):
         if strategy == 'long_short':
             self.back_tester.long_short(signal)
+        if strategy == 'long':
+            self.back_tester.long(signal=signal, n=n, zt_filter=zt_filter,
+                                  position_mode=position_mode)
         if strategy == 'long_top_n':
-            self.back_tester.long_top_n(signal=signal, n=n, zt_filter=zt_filter, position_mode=position_mode)
+            zt_ret, zt = self.back_tester.long_top_n(signal=signal, n=n, zt_filter=zt_filter,
+                                                     position_mode=position_mode)
         print('mean pnl: {:.4f}, sharp_ratio: {:.4f}, max_dd: {:.4f}'.format(self.back_tester.mean_pnl * 100,
                                                                              self.back_tester.sharp_ratio,
                                                                              self.back_tester.max_dd * 100))
+        if strategy == 'long_top_n':
+            return zt_ret, zt
 
     def dump_signal(self, signal):
         num = len(os.listdir(self.dump_signal_path))  # 先统计有多少信号

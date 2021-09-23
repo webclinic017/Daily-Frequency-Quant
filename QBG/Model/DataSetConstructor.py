@@ -56,7 +56,7 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         if end_date is None:
             end_date = str(self.data.end_date)
         if signals_dic is None:
-            signals_dic = self.signals_dic.copy
+            signals_dic = self.signals_dic
 
         start, end = self.data.get_real_date(start_date, end_date)
 
@@ -65,6 +65,7 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
         for i in range(start, end + 1):
             x_tmp = []
             y_tmp = self.data.ret[i + self.shift, self.data.top[i]].copy()  # 做shift
+            pre_y_tmp = self.data.ret[i + self.shift - 1, self.data.top[i]].copy()
             for j in signals_dic.keys():
 
                 tmp = signals_dic[j][i, self.data.top[i]].copy()
@@ -75,9 +76,9 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
                         tmp /= np.std(tmp)
                     tmp[tmp > 3] = 3
                     tmp[tmp < -3] = -3
-                x_tmp.append(tmp[y_tmp < 0.99])
+                x_tmp.append(tmp[pre_y_tmp < 0.99])
 
-            y_tmp = y_tmp[y_tmp < 0.99]
+            y_tmp = y_tmp[pre_y_tmp < 0.99]
             x.append(np.vstack(x_tmp).T)
 
             if zscore:

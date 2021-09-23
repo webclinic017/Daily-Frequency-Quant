@@ -100,11 +100,15 @@ class BackTester:
                                                                                               self.data.top[i]]) / 2)
         self.cal_stats()
 
-    def long(self, start_date=None, end_date=None, n=0):  # 多头策略
+    def long(self, start_date=None, end_date=None, n=0, signal=None, zt_filter=False,
+             position_mode='weighted'):  # 多头策略
         """
         :param start_date: 开始日期
         :param end_date: 结束日期
         :param n: 进入股票数量，0表示使用top
+        :param signal: 可以传入一个自定义的signal，默认使用自身的signal
+        :param zt_filter: 是否过滤涨停
+        :param position_mode: 仓位配置模式
         :return:
         """
         self.pnl = []
@@ -119,36 +123,58 @@ class BackTester:
 
         start, end = self.data.get_real_date(start_date, end_date)
 
+        if signal is None:
+            signal = self.signal.copy()
+
+        pos = np.array([i for i in range(len(self.data.top[0]))])  # 记录位置
+        last_pos = None  # 记录上一次持仓的股票
         if n != 0:  # 暂时不管
             return
         else:
             for i in range(start, end + 1):
-                tmp = self.signal[i].copy()
+                tmp = signal[i].copy()
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
                 tmp[self.data.top[i] & (tmp < 0)] = 0
-                tmp_ret = self.data.ret[i + 1, self.data.top[i]].copy()
+                tmp_ret = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)].copy()
                 # tmp[self.data.top[i] & (self.data.ret[i] >= 0.099)] = 0  # 剔除涨停板
                 tmp[self.data.top[i] & (tmp > 0)] /= np.sum(tmp[self.data.top[i] & (tmp > 0)])
-                self.pnl.append(np.sum(tmp[self.data.top[i]] * tmp_ret) -
+                sig_tmp = tmp[self.data.top[i] & (tmp > 0)].copy()
+                this_pos = pos[self.data.top[i] & (tmp > 0)].copy()
+                if zt_filter:
+                    if last_pos is not None:
+                        for j in range(len(this_pos)):
+                            if (self.data.ret[i, self.data.top[i] & (tmp > 0)][j] > 0.099) and (this_pos[j]
+                                                                                                not in last_pos):
+                                sig_tmp[j] = 0
+                                this_pos[j] = -1
+
+
+                    else:
+                        for j in range(len(this_pos)):
+                            if self.data.ret[i, self.data.top[i] & (tmp > 0)][j] > 0.099:
+                                sig_tmp[j] = 0
+                                this_pos[j] = -1
+                last_pos = this_pos.copy()
+                self.pnl.append(np.sum(sig_tmp * tmp_ret) -
                                 np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 if not self.cumulated_pnl:
-                    self.cumulated_pnl.append(np.sum(tmp[self.data.top[i]] * tmp_ret) -
+                    self.cumulated_pnl.append(np.sum(sig_tmp * tmp_ret) -
                                               np.mean(self.data.ret[i + 1, self.data.top[i]]))
                 else:
                     self.cumulated_pnl.append(
-                        self.cumulated_pnl[-1] + np.sum(tmp[self.data.top[i]] * tmp_ret) -
+                        self.cumulated_pnl[-1] + np.sum(sig_tmp * tmp_ret) -
                         np.mean(self.data.ret[i + 1, self.data.top[i]]))
         self.cal_stats()
 
     def long_top_n(self, start_date=None, end_date=None, n=0, signal=None, zt_filter=True,
                    position_mode='weighted'):  # 做多预测得分最高的n只股票
         """
-        :param position_mode: 仓位配置模式
         :param start_date: 开始日期
         :param end_date: 结束日期
         :param n: 做多多少只股票，默认按照top做多
         :param signal: 可以传入一个自定义的signal，默认使用自身的signal
         :param zt_filter: 是否过滤涨停
+        :param position_mode: 仓位配置模式
         :return:
         """
         self.pnl = []
@@ -169,8 +195,12 @@ class BackTester:
             signal = self.signal.copy()
 
         pos = np.array([i for i in range(len(self.data.top[0]))])  # 记录位置
-        last_pos = None  # 记录上一次持仓的股票，这里会有bug
+        last_pos = None  # 记录上一次持仓的股票
         if n != 0:
+            zt = []
+            in_zt = []
+            zt_ret = []
+            zt_w = []
             for i in range(start, end + 1):
                 tmp = signal[i].copy()
                 tmp[self.data.top[i]] -= np.mean(tmp[self.data.top[i]])
@@ -179,21 +209,51 @@ class BackTester:
                 if np.sum(tmp != 0) == 0:
                     continue
                 a = tmp[self.data.top[i] & (tmp > 0)].argsort()[-n:]
-                this_pos = pos[self.data.top[i] & (tmp > 0)][a]  # 本次持仓的股票
+                this_pos = pos[self.data.top[i] & (tmp > 0)][a].copy()  # 本次持仓的股票
+                '''
+                try:
+                    print(len(list(set(this_pos) & set(last_pos))))
+                except TypeError:
+                    pass
+                '''
                 self.log.append((self.data.position_date_dic[i],
                                  self.data.order_code_dic[pos[self.data.top[i] & (tmp > 0)][a][0]]))
                 ret_tmp = self.data.ret[i + 1, self.data.top[i] & (tmp > 0)][a].copy()
                 sig_tmp = tmp[self.data.top[i] & (tmp > 0)][a].copy()
+                sig_tmp /= np.sum(sig_tmp)
+                zt_weight = []
                 if zt_filter:
+                    in_z = 0
                     if last_pos is not None:
                         for j in range(n):
                             if (self.data.ret[i, self.data.top[i] & (tmp > 0)][a][j] > 0.099) and (this_pos[j]
                                                                                                    not in last_pos):
+                                zt_weight.append(sig_tmp[j])
                                 sig_tmp[j] = 0
+                                this_pos[j] = -1
+                            elif self.data.ret[i, self.data.top[i] & (tmp > 0)][j] > 0.099:
+                                in_z += 1
+
                     else:
-                        sig_tmp[(self.data.ret[i, self.data.top[i] & (tmp > 0)][a] > 0.099)] = 0  # 如果需要剔除涨停
-                sig_tmp /= np.sum(sig_tmp)
+                        for j in range(n):
+                            if self.data.ret[i, self.data.top[i] & (tmp > 0)][a][j] > 0.099:
+                                sig_tmp[j] = 0
+                                zt_weight.append(sig_tmp[j])
+                                this_pos[j] = -1
+
+                # sig_tmp /= np.sum(sig_tmp)
                 # print(np.sum(sig_tmp == 0))
+                    in_zt.append(in_z)
+                zt.append(np.sum(sig_tmp == 0))  # 统计涨停总数
+                if zt[-1] > 0:
+                    if position_mode == 'weighted':
+                        zt_ret.append(np.sum(np.array(zt_weight) * ret_tmp[sig_tmp == 0]))  # 统计涨停收益
+                    else:
+                        zt_ret.append(np.mean(ret_tmp[sig_tmp == 0]))  # * zt[-1] / n)
+                    zt_w.append(np.sum(zt_weight))  # 涨停权重占比
+                else:
+                    zt_ret.append(0)
+                    zt_w.append(0)
                 last_pos = this_pos.copy()
                 if position_mode == 'mean':
                     self.pnl.append(np.mean(ret_tmp[sig_tmp != 0]) -
@@ -217,11 +277,21 @@ class BackTester:
                                               np.sum(tmp[self.data.top[i] & (tmp > 0)][a]))
                                               """
                     # self.cumulated_pnl.append(self.cumulated_pnl[-1] +
-                                              # np.mean(ret_tmp[ret_tmp != 0]))
+                    # np.mean(ret_tmp[ret_tmp != 0]))
                     self.cumulated_pnl.append(self.cumulated_pnl[-1] + self.pnl[-1])
 
                     self.market_cumulated_pnl.append(self.market_cumulated_pnl[-1] +
                                                      np.mean(self.data.ret[i + 1, self.data.top[i]]))
+            print(np.mean(zt))
+            zt_ret = np.array(zt_ret)
+            zt = np.array(zt)
+            print(np.mean(zt_ret) * 100)
+            print(np.mean(zt_w))
+            print(np.mean(in_zt))
+            if position_mode == 'mean':
+                print(np.corrcoef(zt_ret[zt != 0], zt[zt != 0])[0, 1])
+            self.cal_stats()
+            return zt_ret, zt
         else:
             for i in range(start, end + 1):
                 tmp = self.signal[i].copy()
