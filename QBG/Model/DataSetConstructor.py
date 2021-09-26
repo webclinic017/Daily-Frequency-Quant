@@ -70,6 +70,7 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
 
                 tmp = signals_dic[j][i, self.data.top[i]].copy()
                 tmp[np.isnan(tmp)] = 0  # 需要处理异常值
+                tmp[np.isinf(tmp)] = 0
                 if zscore:
                     tmp -= np.mean(tmp)
                     if np.sum(tmp != 0) >= 2:
@@ -79,6 +80,7 @@ class DataSetConstructor:  # 构造给定起始日期的模型训练数据集
                 x_tmp.append(tmp[pre_y_tmp < 0.99])
 
             y_tmp = y_tmp[pre_y_tmp < 0.99]
+            y_tmp[np.isnan(y_tmp)] = 0
             x.append(np.vstack(x_tmp).T)
 
             if zscore:

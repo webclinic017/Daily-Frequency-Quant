@@ -154,9 +154,13 @@ class AutoFactory:
             s_forward = str(self.data.position_date_dic[i])
             e_forward = str(self.data.position_date_dic[i])
             print('testing {} to {}'.format(s_forward, e_forward))
-            if stride == 0:
+            if stride == 0:  # 此时需要用历史数据训练模型
                 x, y = self.dsc.construct(start_date=s_date, end_date=e_date)
-                model.fit(x[:-1000, :], y[:-1000], x[-1000:, :], y[-1000:], model=model_name)
+                y[np.isnan(y)] = 0
+                if frequency == 'weekly':
+                    model.fit(x[:-5000, :], y[:-5000], x[-5000:, :], y[-5000:], model=model_name)
+                else:
+                    model.fit(x[:-1000, :], y[:-1000], x[-1000:, :], y[-1000:], model=model_name)
             stride += 1
             if stride == time_window:
                 stride = 0
