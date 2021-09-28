@@ -31,6 +31,9 @@ v1.0
 
 2021-09-22
 -- 更新：get_pv_data获取分钟数据时，采用增量更新，已有的数据不再重复查询，节约查询行数
+
+2021-09-28
+-- 不同频率的日内数据分开存放，为了提高数据获取量，现在默认获取10min数据
 """
 
 import numpy as np
@@ -200,26 +203,47 @@ class DataLoader:
                     pickle.dump(industry_dic, f)
                 print('{} done.'.format(date))
 
-        if 'minute' in data_type:
-            lst = os.listdir('{}/StockIntraDayData'.format(self.data_path))
+        if '1m' in data_type:
+            lst = os.listdir('{}/StockIntraDayData/1m'.format(self.data_path))
             for i in range((end - begin).days + 1):
                 date = begin + datetime.timedelta(days=i)
                 if date.weekday() in [5, 6]:  # 略过周末
                     continue
                 if str(date) not in lst:
-                    os.makedirs('{}/StockIntraDayData/{}'.format(self.data_path, date))
-                stocks = os.listdir('{}/StockIntraDayData/{}'.format(self.data_path, date))  # 上一次查询已有的股票
+                    os.makedirs('{}/StockIntraDayData/1m/{}'.format(self.data_path, date))
+                stocks = os.listdir('{}/StockIntraDayData/1m/{}'.format(self.data_path, date))  # 上一次查询已有的股票
                 for stock in all_stocks:  # 剔除创业板股票，避免超出查询限制
                     if stock[:3] == '300' or stock[:3] == '688':
                         continue
                     if '{}.pkl'.format(stock) in stocks:
                         continue
                     end_date = date + datetime.timedelta(days=1)
-                    intra_day_data = get_price(stock, frequency='minute',
+                    intra_day_data = get_price(stock, frequency='1m',
                                                fields=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
                                                        'factor'],
                                                start_date=date, end_date=end_date)
-                    with open('{}/StockIntraDayData/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
+                    with open('{}/StockIntraDayData/1m/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
+                        pickle.dump(intra_day_data, f)
+
+        if '10m' in data_type:
+            lst = os.listdir('{}/StockIntraDayData/10m'.format(self.data_path))
+            for i in range((end - begin).days + 1):
+                date = begin + datetime.timedelta(days=i)
+                if date.weekday() in [5, 6]:  # 略过周末
+                    continue
+                if str(date) not in lst:
+                    os.makedirs('{}/StockIntraDayData/10m/{}'.format(self.data_path, date))
+                stocks = os.listdir('{}/StockIntraDayData/10m/{}'.format(self.data_path, date))  # 上一次查询已有的股票
+                for stock in all_stocks:  # 剔除创业板股票，避免超出查询限制
+                    if stock[:3] == '300' or stock[:3] == '688':
+                        continue
+                    if '{}.pkl'.format(stock) in stocks:
+                        continue
+                    end_date = date + datetime.timedelta(days=1)
+                    intra_day_data = get_price(stock, frequency='10m',
+                                               fields=['open', 'close', 'low', 'high', 'volume', 'money'],
+                                               start_date=date, end_date=end_date)
+                    with open('{}/StockIntraDayData/10m/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
                         pickle.dump(intra_day_data, f)
 
     """
@@ -261,6 +285,7 @@ class DataLoader:
 
         if frequency is None:
             frequency = ['daily']
+        data = None  # 如果最后没有任何操作，就返回None
         if 'daily' in frequency:  # 当前仅支持日频的回测
             lst = os.listdir('{}'.format(self.back_test_data_path))
             if back_test_name not in lst:
@@ -330,6 +355,7 @@ class DataLoader:
                     pickle.dump(position_date_dic, f)
 
                 # 获得行业字典，形状和数据字典一致，需要构造一个行业到数字的映射
+                industry_order_dic = None
                 if need_industry:
                     industry_order_dic = {'swf': {}, 'sws': {}, 'swt': {}, 'concept': {}}  # 行业编号到对应序号的字典，每个独立
                     order_industry_dic = {'swf': {}, 'sws': {}, 'swt': {}, 'concept': {}}  # 对应序号到行业编号的字典，每个独立
@@ -351,9 +377,11 @@ class DataLoader:
                                             industry_order_dic[key][name] = num_dic[key]  # 该行业分类准则下一个行业编号的序号
                                             order_industry_dic[key][num_dic[key]] = name
                                             num_dic[key] += 1
-                    with open('{}/{}/industry_order_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    with open('{}/{}/industry_order_dic.pkl'.format(self.back_test_data_path, back_test_name),
+                              'wb') as f:
                         pickle.dump(industry_order_dic, f)
-                    with open('{}/{}/order_industry_dic.pkl'.format(self.back_test_data_path, back_test_name), 'wb') as f:
+                    with open('{}/{}/order_industry_dic.pkl'.format(self.back_test_data_path, back_test_name),
+                              'wb') as f:
                         pickle.dump(order_industry_dic, f)
 
                 # 获得数据字典
@@ -497,4 +525,58 @@ class DataLoader:
                 else:
                     data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
                                 data_dic, ret, industry=None, start_date=start_date, end_date=end_date, top=top)
-                return data
+
+            if '10m' in frequency:  # 读取10min数据
+                if 'daily' not in frequncy or data is None:
+                    print('daily data is needed!')
+                    return
+                lst = os.listdir('{}'.format(self.back_test_data_path))
+                if back_test_name not in lst:
+                    os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
+                lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
+                names_to_check = ['10m.pkl']
+                # 判断是否要重写
+                for name in names_to_check:
+                    if name not in lst:
+                        print('{} not found'.format(name))
+                        rewrite = True
+                        break
+                if rewrite:  # 需要重写数据
+                    data.data_dic['intra_close'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                             data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_open'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                            data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_high'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                            data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_low'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                           data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_volume'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                              data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_money'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                             data.data_dic['close'].shape[1]))
+                    data.data_dic['intra_avg'] = np.zeros((data.data_dic['close'].shape[0], 24,
+                                                           data.data_dic['close'].shape[1]))
+                    dates = os.listdir('{}/StockDailyData'.format(self.data_path))
+                    length = int(return_type.split('_')[-1])
+                    names = ['intra_open', 'intra_high', 'intra_low', 'intra_close', 'intra_volume',
+                             'intra_money']
+                    k = 0
+                    print('getting 10m data...')
+                    for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
+                        date = start_date + datetime.timedelta(days=i)
+                        if date.weekday() in [5, 6]:
+                            continue
+                        if str(date) in dates:
+                            stocks = os.listdir('{}/StockIntraData/10m/{}'.format(self.data_path, date))
+                            for stock in stocks:  # 依次读入每一只股票
+                                with open('{}/StockIntraData/10m/{}/{}'.format(self.data_path,
+                                                                               date, stock), 'rb') as file:
+                                    intra_data = pickle.load(file)
+                                    for name in names:
+                                        data.data_dic[name][k, :, code_order_dic[stock]] = intra_data[name].values
+                                    data.data_dic['intra_avg'][k, :, code_order_dic[stock]] = \
+                                        intra_data['money'].values / intra_data['volume'].values
+                            k += 1
+                            print('{} done.'.format(date))
+
+        return data
