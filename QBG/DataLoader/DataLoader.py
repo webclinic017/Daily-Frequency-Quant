@@ -499,7 +499,6 @@ class DataLoader:
                 else:
                     data = Data(code_order_dic, order_code_dic, date_position_dic, position_date_dic,
                                 data_dic, ret, industry=None, start_date=start_date, end_date=end_date, top=top)
-                return data
             else:
                 # 直接读入数据
                 print('using cache')
@@ -527,20 +526,24 @@ class DataLoader:
                                 data_dic, ret, industry=None, start_date=start_date, end_date=end_date, top=top)
 
             if '10m' in frequency:  # 读取10min数据
-                if 'daily' not in frequncy or data is None:
+                if 'daily' not in frequency or data is None:
                     print('daily data is needed!')
                     return
                 lst = os.listdir('{}'.format(self.back_test_data_path))
                 if back_test_name not in lst:
                     os.makedirs('{}/{}'.format(self.back_test_data_path, back_test_name))
                 lst = os.listdir('{}/{}'.format(self.back_test_data_path, back_test_name))
-                names_to_check = ['10m.pkl']
+                names_to_check = ['intra_open.pkl', 'intra_high.pkl', 'intra_low.pkl', 'intra_close.pkl',
+                                  'intra_volume.pkl', 'intra_money.pkl', 'intra_avg.pkl']
                 # 判断是否要重写
                 for name in names_to_check:
                     if name not in lst:
                         print('{} not found'.format(name))
                         rewrite = True
                         break
+                names = ['intra_open', 'intra_high', 'intra_low', 'intra_close', 'intra_volume',
+                         'intra_money', 'intra_avg']
+                # 判断是否要重写
                 if rewrite:  # 需要重写数据
                     data.data_dic['intra_close'] = np.zeros((data.data_dic['close'].shape[0], 24,
                                                              data.data_dic['close'].shape[1]))
@@ -558,8 +561,6 @@ class DataLoader:
                                                            data.data_dic['close'].shape[1]))
                     dates = os.listdir('{}/StockDailyData'.format(self.data_path))
                     length = int(return_type.split('_')[-1])
-                    names = ['intra_open', 'intra_high', 'intra_low', 'intra_close', 'intra_volume',
-                             'intra_money']
                     k = 0
                     print('getting 10m data...')
                     for i in range(-back_windows, (end_date - start_date).days + 1 + length + 1):
@@ -567,16 +568,27 @@ class DataLoader:
                         if date.weekday() in [5, 6]:
                             continue
                         if str(date) in dates:
-                            stocks = os.listdir('{}/StockIntraData/10m/{}'.format(self.data_path, date))
+                            stocks = os.listdir('{}/StockIntraDayData/10m/{}'.format(self.data_path, date))
                             for stock in stocks:  # 依次读入每一只股票
-                                with open('{}/StockIntraData/10m/{}/{}'.format(self.data_path,
-                                                                               date, stock), 'rb') as file:
+                                with open('{}/StockIntraDayData/10m/{}/{}'.format(self.data_path,
+                                                                                  date, stock), 'rb') as file:
                                     intra_data = pickle.load(file)
-                                    for name in names:
-                                        data.data_dic[name][k, :, code_order_dic[stock]] = intra_data[name].values
-                                    data.data_dic['intra_avg'][k, :, code_order_dic[stock]] = \
-                                        intra_data['money'].values / intra_data['volume'].values
+                                    try:
+                                        for name in names:
+                                            data.data_dic[name][k, :, code_order_dic[stock[:-4]]] = \
+                                                intra_data[name[6:]].values
+                                        data.data_dic['intra_avg'][k, :, code_order_dic[stock[:-4]]] = \
+                                            intra_data['money'].values / intra_data['volume'].values
+                                    except KeyError:
+                                        pass
                             k += 1
                             print('{} done.'.format(date))
-
+                    for name in names:
+                        with open('{}/{}/{}.pkl'.format(self.back_test_data_path, back_test_name, name), 'wb') as f:
+                            pickle.dump(data.data_dic[name], f)
+                else:
+                    print('using cache')
+                    for name in names:
+                        with open('{}/{}/{}.pkl'.format(self.back_test_data_path, back_test_name, name), 'rb') as f:
+                            data.data_dic[name] = pickle.load(f)
         return data
