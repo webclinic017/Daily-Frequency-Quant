@@ -34,9 +34,13 @@ v1.0
 
 2021-09-28
 -- 不同频率的日内数据分开存放，为了提高数据获取量，现在默认获取10min数据
+
+2021-10-01
+-- DataFrame类型的数据默认写入方式为csv，避免pandas的版本不同而无法读入
 """
 
 import numpy as np
+import pandas as pd
 import os
 import pickle
 import jqdatasdk
@@ -158,12 +162,12 @@ class DataLoader:
                 # 获取财务数据
                 fundamental = get_fundamentals(query(valuation, indicator), date=date)
                 fundamental.index = fundamental['code']
-                with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                    pickle.dump(money_flow, f)
-                with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                    pickle.dump(fundamental, f)
-                with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                    pickle.dump(stock_data, f)
+                money_flow.to_csv('{}/StockDailyData/{}/money_flow_{}.csv'.format(self.data_path, date, date),
+                                  index=False)
+                fundamental.to_csv('{}/StockDailyData/{}/fundamental_{}.csv'.format(self.data_path, date, date),
+                                  index=False)
+                stock_data.to_csv('{}/StockDailyData/{}/stock_{}.csv'.format(self.data_path, date, date),
+                                  index=False)
                 print('{} done.'.format(date))
 
         if 'index_daily' in data_type:
@@ -174,8 +178,8 @@ class DataLoader:
                 if date.weekday() in [5, 6]:  # 略过周末
                     continue
                 all_indexes = get_all_securities(types=['index'], date=date)
-                with open('{}/StockDailyData/{}/index_{}.pkl'.format(self.data_path, date, date), 'wb') as f:
-                    pickle.dump(all_indexes, f)
+                all_indexes.to_csv('{}/StockDailyData/{}/index_{}.csv'.format(self.data_path, date, date),
+                                  index=False)
                 print('{} done.'.format(date))
 
         if 'industry' in data_type:  # 获取行业分类，最后以字典形式存储
@@ -222,8 +226,8 @@ class DataLoader:
                                                fields=['open', 'close', 'low', 'high', 'volume', 'money', 'pre_close',
                                                        'factor'],
                                                start_date=date, end_date=end_date)
-                    with open('{}/StockIntraDayData/1m/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
-                        pickle.dump(intra_day_data, f)
+                    intra_day_data.to_csv('{}/StockIntraDayData/1m/{}/{}.csv'.format(self.data_path, date, stock),
+                                          index=False)
 
         if '10m' in data_type:
             lst = os.listdir('{}/StockIntraDayData/10m'.format(self.data_path))
@@ -237,14 +241,14 @@ class DataLoader:
                 for stock in all_stocks:  # 剔除创业板股票，避免超出查询限制
                     if stock[:3] == '300' or stock[:3] == '688':
                         continue
-                    if '{}.pkl'.format(stock) in stocks:
+                    if '{}.csv'.format(stock) in stocks:
                         continue
                     end_date = date + datetime.timedelta(days=1)
                     intra_day_data = get_price(stock, frequency='10m',
                                                fields=['open', 'close', 'low', 'high', 'volume', 'money'],
                                                start_date=date, end_date=end_date)
-                    with open('{}/StockIntraDayData/10m/{}/{}.pkl'.format(self.data_path, date, stock), 'wb') as f:
-                        pickle.dump(intra_day_data, f)
+                    intra_day_data.to_csv('{}/StockIntraDayData/10m/{}/{}.csv'.format(self.data_path, date, stock),
+                                          index=False)
 
     """
     get_matrix_data方法读取给定起始日期的原始数据，并生成需要的收益率矩阵，字典等
@@ -329,9 +333,9 @@ class DataLoader:
                     if str(date) in dates:
                         date_position_dic[date] = days  # 这个日期对应的矩阵第几行
                         position_date_dic[days] = date  # 第几行对应的是哪一天的日期
-                        with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
-                                                                             date, date), 'rb') as file:
-                            data = pickle.load(file)
+                        data = pd.read_csv('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
+                                                                             date, date))
+
                             if len(data) == 0:  # 说明当前无交易，略过
                                 continue
                             codes = list(data['code'])
@@ -408,42 +412,39 @@ class DataLoader:
                         continue
                     if str(date) in dates:
                         # 处理基本数据
-                        with open('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
-                                                                             date, date), 'rb') as file:
-                            data = pickle.load(file)
-                            if len(data) == 0:
+                        data = pd.read_csv('{}/StockDailyData/{}/stock_{}.pkl'.format(self.data_path,
+                                                                             date, date))
+                        if len(data) == 0:
+                            continue
+                        index = list(data['code'])
+                        for j in range(len(data)):
+                            if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
                                 continue
-                            index = list(data['code'])
-                            for j in range(len(data)):
-                                if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
-                                    continue
-                                for name in names[:7]:
-                                    data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
+                            for name in names[:7]:
+                                data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
 
                         # 处理基本面
-                        with open('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
-                                                                                   date, date), 'rb') as file:
-                            data = pickle.load(file)
-                            index = list(data.index)
-                            for j in range(len(data)):
-                                if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
-                                    continue
-                                for name in names[7:8]:
-                                    try:
-                                        data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
-                                    except KeyError:
-                                        pass
+                        data = pd.read_csv('{}/StockDailyData/{}/fundamental_{}.pkl'.format(self.data_path,
+                                                                                   date, date))
+                        index = list(data.index)
+                        for j in range(len(data)):
+                            if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
+                                continue
+                            for name in names[7:8]:
+                                try:
+                                    data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
+                                except KeyError:
+                                    pass
 
                         # 处理资金流
-                        with open('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path,
-                                                                                  date, date), 'rb') as file:
-                            data = pickle.load(file)
-                            index = list(data.index)
-                            for j in range(len(data)):
-                                if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
-                                    continue
-                                for name in names[8:]:
-                                    data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
+                        data = pd.read_csv('{}/StockDailyData/{}/money_flow_{}.pkl'.format(self.data_path,
+                                                                                  date, date))
+                        index = list(data.index)
+                        for j in range(len(data)):
+                            if index[j][:3] in ['688', '300']:  # 剔除科创版和创业板股票
+                                continue
+                            for name in names[8:]:
+                                data_dic[name][k, code_order_dic[index[j]]] = data[name].iloc[j]
 
                         # 处理行业
                         if need_industry:
